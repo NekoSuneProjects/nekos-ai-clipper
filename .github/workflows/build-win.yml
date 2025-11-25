@@ -49,8 +49,6 @@ jobs:
       - name: Generate Release Notes
         id: release_notes
         uses: release-drafter/release-drafter@v6
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
         with:
           version: ${{ env.VERSION }}
           name: "NekosAIClipper ${{ env.VERSION }}"
@@ -75,8 +73,6 @@ jobs:
           files: |
             dist/NekosAIClipper-Setup-${{ env.VERSION }}.exe
             dist/NekosAIClipper-Setup-${{ env.VERSION }}.msi
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
 
       # ==============================
       # Discord Notify
