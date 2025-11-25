@@ -37,7 +37,7 @@ jobs:
       - name: Build Windows App
         run: npm run build:win
         env:
-          GH_TOKEN: ${{ secrets.Personal_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: List dist folder
         run: Get-ChildItem -Recurse dist
@@ -50,7 +50,7 @@ jobs:
         id: release_notes
         uses: release-drafter/release-drafter@v6
         env:
-          Personal_TOKEN: ${{ secrets.Personal_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           version: ${{ env.VERSION }}
           name: "NekosAIClipper ${{ env.VERSION }}"
@@ -76,7 +76,7 @@ jobs:
             dist/NekosAIClipper-Setup-${{ env.VERSION }}.exe
             dist/NekosAIClipper-Setup-${{ env.VERSION }}.msi
         env:
-          Personal_TOKEN: ${{ secrets.Personal_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # ==============================
       # Discord Notify
