@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+
+<head>
+  <meta charset="UTF-8" />
+  <title>AI Clipper</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <script>
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            bg: "#0f172a",
+            card: "#1e293b",
+            card2: "#243145",
+            accent: "#6366f1",
+            accent2: "#7c3aed",
+            tagKill: "#ef4444",
+            tagReaction: "#22c55e",
+            tagStreak: "#f59e0b",
+          },
+        },
+      },
+    };
+  </script>
+</head>
+
+<body class="bg-bg text-gray-200 min-h-screen p-6 space-y-6">
+
+  <h1 class="text-3xl font-bold text-accent mb-4">AI Clipper</h1>
+
+  <!-- Import Section -->
+  <section class="bg-card/70 border border-gray-700 p-4 rounded-xl space-y-4">
+    <h2 class="text-xl font-semibold mb-2">🎥 Import Video</h2>
+
+    <div class="flex gap-3">
+      <button id="pickVideo" class="px-4 py-2 rounded bg-accent hover:bg-accent2">
+        Select Local Video
+      </button>
+
+      <button id="analyse"
+        class="px-4 py-2 rounded bg-gray-700 text-gray-400 border border-gray-600 cursor-not-allowed">
+        Analyse Highlights
+      </button>
+    </div>
+
+    <div class="flex items-center gap-3">
+      <input id="vodUrl" placeholder="Paste YouTube / Twitch / Kick URL"
+        class="flex-1 bg-card2 p-2 rounded border border-gray-700" />
+
+      <button id="importVod" class="px-4 py-2 bg-card2 border border-gray-700 rounded hover:bg-gray-700">
+        Import & Analyse
+      </button>
+    </div>
+  </section>
+
+  <!-- MODE SELECTION -->
+  <section class="bg-card/70 border border-gray-700 p-4 rounded-xl">
+    <h2 class="text-xl font-semibold mb-3">🎮 Highlight Mode</h2>
+    <div class="flex gap-6">
+
+      <!-- Just Chatting -->
+      <label class="flex items-center gap-2">
+        <input type="radio" name="modeType" value="reaction" checked class="w-4 h-4" />
+        <span>Reactions Only (Just Chatting)</span>
+      </label>
+
+      <!-- FPS -->
+      <label class="flex items-center gap-2">
+        <input type="radio" name="modeType" value="fps" class="w-4 h-4" />
+        <span>FPS Only (Kills + Killstreaks)</span>
+      </label>
+
+    </div>
+  </section>
+
+  <!-- RENDERING OPTIONS -->
+  <section class="bg-card/70 border border-gray-700 p-4 rounded-xl">
+    <h2 class="text-xl font-semibold mb-3">🎬 Render Settings</h2>
+
+    <label class="flex items-center gap-2">
+      <input type="radio" name="renderMode" value="standard" checked class="w-4 h-4" />
+      <span>Standard (Original Audio)</span>
+    </label>
+
+    <label class="flex items-center gap-2">
+      <input type="radio" name="renderMode" value="montage" class="w-4 h-4" />
+      <span>Montage (Music Synced)</span>
+    </label>
+
+    <div id="musicSelector" class="hidden mt-3">
+      <button id="chooseMusic" class="px-4 py-2 rounded bg-accent hover:bg-accent2">
+        Select Music
+      </button>
+
+      <div id="musicInfo" class="text-gray-400 text-sm mt-1"></div>
+    </div>
+  </section>
+
+  <!-- HIGHLIGHT LIST -->
+  <section class="bg-card/60 border border-gray-700 p-4 rounded-xl">
+    <h2 class="text-xl font-semibold mb-3">✨ Detected Highlights</h2>
+    <div id="analyseProgress" class="text-gray-300"></div>
+    <div id="highlightList" class="space-y-3"></div>
+  </section>
+
+  <!-- RENDER MESSAGE -->
+  <section class="bg-card/60 border border-gray-700 p-4 rounded-xl">
+    <h2 class="text-xl font-semibold mb-3">Render Message</h2>
+    <div id="status" class="text-gray-300"></div>
+  </section>
+
+  <script src="renderer.js"></script>
+
+  <script>
+    // Toggle music selector
+    document.querySelectorAll('input[name="renderMode"]').forEach(el => {
+      el.addEventListener("change", () => {
+        document.getElementById("musicSelector")
+          .classList.toggle("hidden", el.value !== "montage");
+      });
+    });
+  </script>
+</body>
+
+</html>
