@@ -1,0 +1,65 @@
+{
+  "name": "ai-clipper",
+  "version": "1.0.0",
+  "description": "AI-ish clipping app with VOD import + loud reaction detection",
+  "main": "main.js",
+  "bin": "main.js",
+  "author": "NekoSuneVR",
+  "scripts": {
+    "test": "electron .",
+    "build": "electron-builder",
+    "build:win": "electron-builder --win"
+  },
+  "build": {
+    "copyright": "Copyright © 2025 NekoSuneVR",
+    "appId": "com.nekosunevr.aiclipper",
+    "productName": "NekosAIClipper",
+    "nsis": {
+      "allowToChangeInstallationDirectory": true,
+      "license": "license.txt",
+      "oneClick": false
+    },
+    "win": {
+      "artifactName": "${productName}-Setup-${version}.${ext}",
+      "icon": "assets/icon.ico",
+      "files": [
+        "main.js",
+        "core/**",
+        "preload.js",
+        "index.js",
+        "python/**",
+        "renderer/**",
+        "tools/toolsManager.js",
+        "assets/**"
+      ],
+      "target": [
+        "nsis",
+        "msi"
+      ]
+    },
+    "appx": {
+      "backgroundColor": "#ffffff",
+      "displayName": "NekosAIClipper",
+      "publisher": "CN=NekoSuneVR",
+      "publisherDisplayName": "NekoSuneVR",
+      "identityName": "com.nekosunevr.aiclipper"
+    },
+    "directories": {
+      "output": "dist",
+      "buildResources": "assets"
+    }
+  },
+  "dependencies": {
+    "fluent-ffmpeg": "^2.1.2",
+    "png-chunks-extract": "^1.0.0",
+    "pngjs": "^7.0.0",
+    "tesseract.js": "^6.0.1",
+    "unzipper": "^0.12.3",
+    "wav-decoder": "^1.3.0",
+    "yt-dlp-exec": "^1.0.2"
+  },
+  "devDependencies": {
+    "electron": "^32.0.0",
+    "electron-builder": "^25.1.8"
+  }
+}

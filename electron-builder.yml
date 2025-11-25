@@ -1,0 +1,13 @@
+appId: com.nekosunevr.aiclipper
+productName: NekosAIClipper
+copyright: Copyright 2025 NekoSuneVR
+build:
+    appId: com.nekosunevr.aiclipper
+    win32:
+        target: nsis
+    win64:
+        target: nsis
+    nsis:
+        oneClick: false
+        allowToChangeInstallationDirectory: true
+        license: license.txt
