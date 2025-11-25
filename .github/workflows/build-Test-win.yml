@@ -44,7 +44,7 @@ jobs:
       - name: Build Electron App
         run: npm run build:win
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.Personal_TOKEN }}
 
       - name: List dist folder
         run: Get-ChildItem -Recurse dist
@@ -56,6 +56,8 @@ jobs:
       - name: Generate Release Notes
         id: release_notes
         uses: release-drafter/release-drafter@v6
+        env:
+          Personal_TOKEN: ${{ secrets.Personal_TOKEN }}
         with:
           version: ${{ env.VERSION }}${{ env.TEST_BUILD_TAG }}
           name: "NekosAIClipper ${{ env.VERSION }}${{ env.TEST_BUILD_TAG }}"
@@ -80,6 +82,8 @@ jobs:
           files: |
             dist/NekosAIClipper-Setup-${{ env.VERSION }}.exe
             dist/NekosAIClipper-Setup-${{ env.VERSION }}.msi
+        env:
+          Personal_TOKEN: ${{ secrets.Personal_TOKEN }}
 
       # ---------------------------------------
       # Notify Discord
