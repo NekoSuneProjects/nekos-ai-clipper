@@ -1,0 +1,114 @@
+name: (Windows x64) Test Build & Upload NekosAIClipper (Pre-release)
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+on:
+  push:
+    branches:
+      - TESTING
+
+jobs:
+  build-and-upload-windows:
+    if: github.event_name == 'push'
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 21
+          cache: npm
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Get Version
+        id: get_version
+        shell: pwsh
+        run: |
+          $version = node -p "require('./package.json').version"
+          echo "VERSION=$version" >> $env:GITHUB_ENV
+
+      - name: Set Test Build Tag
+        shell: pwsh
+        run: |
+          $tag = "-Test_v${{ github.run_number }}"
+          echo "TEST_BUILD_TAG=$tag" >> $env:GITHUB_ENV
+
+      - name: Build Electron App
+        run: npm run build:win
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: List dist folder
+        run: Get-ChildItem -Recurse dist
+        shell: pwsh
+
+      # ---------------------------------------
+      # Generate Release Notes
+      # ---------------------------------------
+      - name: Generate Release Notes
+        id: release_notes
+        uses: release-drafter/release-drafter@v6
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          version: ${{ env.VERSION }}${{ env.TEST_BUILD_TAG }}
+          name: "NekosAIClipper ${{ env.VERSION }}${{ env.TEST_BUILD_TAG }}"
+          tag: ${{ env.VERSION }}${{ env.TEST_BUILD_TAG }}
+
+      - name: Save Release Notes Locally
+        run: |
+          echo "${{ steps.release_notes.outputs.body }}" > release_notes.txt
+
+      # ---------------------------------------
+      # Create GitHub Pre-Release (Published)
+      # ---------------------------------------
+      - name: Create GitHub Pre-Release
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: "${{ env.VERSION }}${{ env.TEST_BUILD_TAG }}"
+          name: "NekosAIClipper ${{ env.VERSION }}${{ env.TEST_BUILD_TAG }}"
+          body_path: release_notes.txt
+          draft: false
+          prerelease: true
+          files: |
+            dist/NekosAIClipper-Setup-${{ env.VERSION }}.exe
+            dist/NekosAIClipper-Setup-${{ env.VERSION }}.msi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # ---------------------------------------
+      # Notify Discord
+      # ---------------------------------------
+      - name: Send Release Info to Discord
+        shell: pwsh
+        env:
+          DISCORD_WEBHOOK_TESTING: ${{ secrets.DISCORD_WEBHOOK_TESTING }}
+        run: |
+          $releaseNotes = Get-Content release_notes.txt -Raw
+          $tag = "${{ env.VERSION }}${{ env.TEST_BUILD_TAG }}"
+
+          $jsonPayload = @{
+            username = "NekosAIClipper Bot"
+            avatar_url = "https://cdn.discordapp.com/icons/1310653602951594024/cb8a2781368442a92b33dd2cb93b3afd.webp?size=512"
+            content = "<@&1384262560395559122> **TEST BUILD RELEASED (WINDOWS)**"
+            embeds = @(
+              @{
+                title = "New Test Release: v$tag"
+                description = "$releaseNotes`n`n[Download EXE](https://github.com/${{ github.repository }}/releases/download/$tag/NekosAIClipper-Setup-${{ env.VERSION }}.exe) | [Download MSI](https://github.com/${{ github.repository }}/releases/download/$tag/NekosAIClipper-Setup-${{ env.VERSION }}.msi)"
+                color = 16776960
+                footer = @{ text = "Released by GitHub Actions" }
+                timestamp = (Get-Date).ToString("o")
+              }
+            )
+          } | ConvertTo-Json -Depth 10
+
+          Invoke-RestMethod -Uri $env:DISCORD_WEBHOOK_TESTING -Method Post -ContentType 'application/json' -Body $jsonPayload

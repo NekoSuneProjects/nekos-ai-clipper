@@ -1,0 +1,106 @@
+name: (Windows x64) Release Build & Upload NekosAIClipper
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+on:
+  push:
+    branches:
+      - RELEASE
+
+jobs:
+  build-and-upload-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 21
+          cache: npm
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Get Version
+        id: get_version
+        shell: pwsh
+        run: |
+          $version = node -p "require('./package.json').version"
+          echo "VERSION=$version" >> $env:GITHUB_ENV
+
+      - name: Build Windows App
+        run: npm run build:win
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: List dist folder
+        run: Get-ChildItem -Recurse dist
+        shell: pwsh
+
+      # ==============================
+      # Generate Release Notes ONLY (no draft)
+      # ==============================
+      - name: Generate Release Notes
+        id: release_notes
+        uses: release-drafter/release-drafter@v6
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          version: ${{ env.VERSION }}
+          name: "NekosAIClipper ${{ env.VERSION }}"
+          tag: ${{ env.VERSION }}
+
+      - name: Save Release Notes Locally
+        run: |
+          echo "${{ steps.release_notes.outputs.body }}" > release_notes.txt
+
+      # ==============================
+      # Create Release + Upload Assets (SINGLE ACTION)
+      # ==============================
+      - name: Create Release and Upload Assets
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ env.VERSION }}
+          name: "NekosAIClipper ${{ env.VERSION }}"
+          body_path: release_notes.txt
+          draft: false
+          prerelease: false
+          files: |
+            dist/NekosAIClipper-Setup-${{ env.VERSION }}.exe
+            dist/NekosAIClipper-Setup-${{ env.VERSION }}.msi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # ==============================
+      # Discord Notify
+      # ==============================
+      - name: Send Release Info to Discord
+        shell: pwsh
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+        run: |
+          $notes = Get-Content release_notes.txt -Raw
+          $v = "${{ env.VERSION }}"
+          $json = @{
+            username = "NekosAIClipper Bot"
+            avatar_url = "https://cdn.discordapp.com/icons/1310653602951594024/cb8a2781368442a92b33dd2cb93b3afd.webp"
+            content = "<@&1384262560395559122> **New Release (WINDOWS)**"
+            embeds = @(
+              @{
+                title = "New Release: v$v"
+                description = "$notes`n`n[Download EXE](https://github.com/${{ github.repository }}/releases/download/$v/NekosAIClipper-Setup-$v.exe) | [Download MSI](https://github.com/${{ github.repository }}/releases/download/$v/NekosAIClipper-Setup-$v.msi)"
+                color = 16776960
+                footer = @{ text = "Released by GitHub Actions" }
+                timestamp = (Get-Date).ToString("o")
+              }
+            )
+          } | ConvertTo-Json -Depth 10
+
+          Invoke-RestMethod -Uri $env:DISCORD_WEBHOOK -Method Post -ContentType 'application/json' -Body $json
