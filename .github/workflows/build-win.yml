@@ -9,6 +9,7 @@ on:
   push:
     branches:
       - RELEASE
+      - TESTING
 
 jobs:
   build-and-upload-windows:
@@ -27,56 +28,81 @@ jobs:
       - name: Install Dependencies
         run: npm install
 
-      - name: Get Version
-        id: get_version
+      # ✅ Get base version from package.json
+      - name: Get Base Version
         shell: pwsh
         run: |
-          $version = node -p "require('./package.json').version"
+          $base = node -p "require('./package.json').version"
+          echo "BASE_VERSION=$base" >> $env:GITHUB_ENV
+
+      # ✅ Determine BETA or RELEASE
+      - name: Determine Channel + Version
+        shell: pwsh
+        run: |
+          if ("${{ github.ref_name }}" -eq "TESTING") {
+            $channel = "beta"
+
+            $tag = "BETA-${{ github.run_number }}"
+            $version = "$($env:BASE_VERSION)-beta-${{ github.run_number }}"
+            $name = "NekosAIClipper BETA V$($env:BASE_VERSION)-${{ github.run_number }}"
+            $prerelease = "true"
+          }
+          else {
+            $channel = "release"
+
+            $tag = $env:BASE_VERSION
+            $version = $env:BASE_VERSION
+            $name = "NekosAIClipper $($env:BASE_VERSION)"
+            $prerelease = "false"
+          }
+
+          echo "CHANNEL=$channel" >> $env:GITHUB_ENV
+          echo "TAG=$tag" >> $env:GITHUB_ENV
           echo "VERSION=$version" >> $env:GITHUB_ENV
+          echo "RELEASE_NAME=$name" >> $env:GITHUB_ENV
+          echo "PRERELEASE=$prerelease" >> $env:GITHUB_ENV
 
       - name: Build Windows App
         run: npm run build:win
         env:
-          GH_TOKEN: ${{ secrets.Personal_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: List dist folder
         run: Get-ChildItem -Recurse dist
         shell: pwsh
 
       # ==============================
-      # Generate Release Notes ONLY (no draft)
+      # Generate Release Notes
       # ==============================
       - name: Generate Release Notes
         id: release_notes
         uses: release-drafter/release-drafter@v6
         env:
-          Personal_TOKEN: ${{ secrets.Personal_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           version: ${{ env.VERSION }}
-          name: "NekosAIClipper ${{ env.VERSION }}"
-          tag: ${{ env.VERSION }}
+          tag: ${{ env.TAG }}
+          name: ${{ env.RELEASE_NAME }}
 
       - name: Save Release Notes Locally
         run: |
           echo "${{ steps.release_notes.outputs.body }}" > release_notes.txt
 
       # ==============================
-      # Create Release + Upload Assets (SINGLE ACTION)
+      # Create Release + Upload Assets
       # ==============================
       - name: Create Release and Upload Assets
-        id: create_release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ env.VERSION }}
-          name: "NekosAIClipper ${{ env.VERSION }}"
+          tag_name: ${{ env.TAG }}
+          name: ${{ env.RELEASE_NAME }}
           body_path: release_notes.txt
-          draft: false
-          prerelease: false
+          prerelease: ${{ env.PRERELEASE == 'true' }}
           files: |
-            dist/NekosAIClipper-Setup-${{ env.VERSION }}.exe
-            dist/NekosAIClipper-Setup-${{ env.VERSION }}.msi
+            dist/NekosAIClipper-Setup-${{ env.BASE_VERSION }}.exe
+            dist/NekosAIClipper-Setup-${{ env.BASE_VERSION }}.msi
         env:
-          Personal_TOKEN: ${{ secrets.Personal_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # ==============================
       # Discord Notify
@@ -87,17 +113,18 @@ jobs:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
         run: |
           $notes = Get-Content release_notes.txt -Raw
-          $v = "${{ env.VERSION }}"
+
+          $exeUrl = "https://github.com/${{ github.repository }}/releases/download/${{ env.TAG }}/NekosAIClipper-Setup-${{ env.BASE_VERSION }}.exe"
+          $msiUrl = "https://github.com/${{ github.repository }}/releases/download/${{ env.TAG }}/NekosAIClipper-Setup-${{ env.BASE_VERSION }}.msi"
+
           $json = @{
             username = "NekosAIClipper Bot"
-            avatar_url = "https://cdn.discordapp.com/icons/1310653602951594024/cb8a2781368442a92b33dd2cb93b3afd.webp"
-            content = "<@&1384262560395559122> **New Release (WINDOWS)**"
+            content = "<@&1384262560395559122> **UPDATE ($($env:CHANNEL.ToUpper()))**"
             embeds = @(
               @{
-                title = "New Release: v$v"
-                description = "$notes`n`n[Download EXE](https://github.com/${{ github.repository }}/releases/download/$v/NekosAIClipper-Setup-$v.exe) | [Download MSI](https://github.com/${{ github.repository }}/releases/download/$v/NekosAIClipper-Setup-$v.msi)"
-                color = 16776960
-                footer = @{ text = "Released by GitHub Actions" }
+                title = "NekosAIClipper $env:VERSION"
+                description = "$notes`n`n[Download EXE]($exeUrl) | [Download MSI]($msiUrl)"
+                color = if ($env:CHANNEL -eq "beta") { 16750848 } else { 16776960 }
                 timestamp = (Get-Date).ToString("o")
               }
             )
