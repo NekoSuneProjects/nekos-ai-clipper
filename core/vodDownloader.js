@@ -9,11 +9,21 @@ function ensureDir(dir) {
   }
 }
 
-// Twitch example:
-// https://www.twitch.tv/videos/2626451997
+// Twitch VOD: https://www.twitch.tv/videos/2626451997
 function extractTwitchId(url) {
   const match = url.match(/twitch\.tv\/videos\/(\d+)/i);
   return match ? `twitch-${match[1]}` : null;
+}
+
+// Twitch CLIP:
+// https://clips.twitch.tv/WiseOptimisticPeppermintBuddhaBar-3u9argC8wcP6vb1A
+// https://www.twitch.tv/<channel>/clip/<slug>
+function extractTwitchClip(url) {
+  let m = url.match(/clips\.twitch\.tv\/([A-Za-z0-9_-]+)/i);
+  if (m) return `twitch-clip-${m[1]}`;
+  m = url.match(/twitch\.tv\/[^/]+\/clip\/([A-Za-z0-9_-]+)/i);
+  if (m) return `twitch-clip-${m[1]}`;
+  return null;
 }
 
 // YouTube example:
@@ -37,6 +47,7 @@ function extractKickId(url) {
 function resolveFilenamePrefix(url) {
   return (
     extractTwitchId(url) ||
+    extractTwitchClip(url) ||
     extractYouTubeId(url) ||
     extractKickId(url) ||
     null
@@ -46,7 +57,7 @@ function resolveFilenamePrefix(url) {
 function detectPlatform(url) {
   const u = url.toLowerCase();
 
-  if (u.includes("twitch.tv")) return "twitch";
+  if (u.includes("twitch.tv")) return "twitch";   // covers clips.twitch.tv too
   if (u.includes("youtube.com") || u.includes("youtu.be")) return "youtube";
   if (u.includes("kick.com")) return "kick";
 
@@ -93,15 +104,18 @@ async function downloadVod(url, folder, onProgress = null) {
   // ---------------------------------------
   // Determine output name from whitelist
   // ---------------------------------------
-  const prefix = resolveFilenamePrefix(url);
-
   const platform = detectPlatform(url);
 
-  if (!prefix) {
-    reject(new Error(
-      "Unsupported platform. Only Twitch, YouTube, and Kick are allowed right now."
-    ));
+  // Gate on the platform (Twitch incl. clips / YouTube / Kick). Throw here — we
+  // are in an async function, NOT a Promise executor, so `reject` doesn't exist.
+  if (!platform) {
+    throw new Error(
+      "Unsupported platform. Only Twitch (videos + clips), YouTube, and Kick are supported."
+    );
   }
+
+  // Nice filename if we can derive one, otherwise a safe platform-stamped name.
+  const prefix = resolveFilenamePrefix(url) || `${platform}-${Date.now()}`;
 
   const addHeader = getPlatformHeaders(platform);
 
