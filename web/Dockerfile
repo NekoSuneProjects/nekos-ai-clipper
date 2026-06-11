@@ -13,8 +13,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       ffmpeg python3 python3-pip python-is-python3 ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# yt-dlp via pip = pure-Python, works on amd64 AND arm64
-RUN pip3 install --no-cache-dir --break-system-packages yt-dlp
+# yt-dlp via pip + curl_cffi for browser impersonation. curl_cffi lets yt-dlp
+# mimic a real Chrome TLS/HTTP fingerprint, which defeats Cloudflare 403s on
+# Kick (and others) that block plain Python requests on Linux/ARM hosts.
+RUN pip3 install --no-cache-dir --break-system-packages --upgrade "yt-dlp[default,curl-cffi]"
 
 WORKDIR /app
 
@@ -32,7 +34,8 @@ ENV PORT=8080 \
     FFMPEG_PATH=ffmpeg \
     FFPROBE_PATH=ffprobe \
     YTDLP_PATH=yt-dlp \
-    PYTHON_PATH=python3
+    PYTHON_PATH=python3 \
+    YTDLP_IMPERSONATE=chrome
 VOLUME ["/data"]
 EXPOSE 8080
 
