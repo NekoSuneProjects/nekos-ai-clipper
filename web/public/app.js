@@ -16,10 +16,6 @@ async function loadOptions() {
   g.innerHTML = '<option value="">Auto / none</option>' +
     games.map((x) => `<option value="${x.id}">${x.name} (${x.id})</option>`).join("");
 
-  const sources = await api("/api/music/sources").catch(() => []);
-  $("music").innerHTML = '<option value="">None</option>' +
-    sources.map((s) => `<option value="${s.id}">${s.name}${s.creditRequired === false ? " (no credit)" : ""}</option>`).join("");
-
   // Supporter links (configured via env on the server)
   const support = await api("/api/support").catch(() => ({ links: [] }));
   const el = $("supportLinks");
@@ -41,6 +37,97 @@ function syncVisibility() {
 }
 $("mode").addEventListener("change", syncVisibility);
 $("renderMode").addEventListener("change", syncVisibility);
+
+// ---------------- MUSIC PICKER ----------------
+let chosenMusic = null; // { id, url, collection, title, artist }
+let musicTabsBuilt = false;
+
+function updateChosenMusic() {
+  const el = $("chosenMusic");
+  if (!el) return;
+  el.textContent = chosenMusic
+    ? `🎵 ${chosenMusic.artist ? chosenMusic.artist + " — " : ""}${chosenMusic.title}`
+    : "No music selected";
+}
+
+$("pickMusic").addEventListener("click", () => {
+  $("musicModal").classList.remove("hidden");
+  if (!musicTabsBuilt) buildMusicTabs();
+});
+$("clearMusic").addEventListener("click", () => { chosenMusic = null; updateChosenMusic(); });
+$("musicClose").addEventListener("click", closeMusicModal);
+$("musicModal").addEventListener("click", (e) => { if (e.target === $("musicModal")) closeMusicModal(); });
+function closeMusicModal() {
+  $("musicModal").classList.add("hidden");
+  try { $("musicAudio").pause(); } catch {}
+}
+
+async function buildMusicTabs() {
+  const sources = await api("/api/music/sources").catch(() => []);
+  const tabs = (sources || []).map((c) => ({ id: c.id, name: c.name }));
+  tabs.push({ id: "curated", name: "NCS Picks" });
+  $("musicTabs").innerHTML = "";
+  tabs.forEach((t) => {
+    const b = document.createElement("button");
+    b.className = "px-3 py-1 rounded text-sm border bg-card2 border-white/10 hover:bg-white/5";
+    b.textContent = t.name;
+    b.dataset.id = t.id;
+    b.onclick = () => selectMusicTab(t.id);
+    $("musicTabs").appendChild(b);
+  });
+  musicTabsBuilt = true;
+  if (tabs.length) selectMusicTab(tabs[0].id);
+}
+
+function highlightMusicTab(id) {
+  [...$("musicTabs").children].forEach((b) => {
+    const active = b.dataset.id === id;
+    b.classList.toggle("btn-grad", active);
+    b.classList.toggle("text-white", active);
+    b.classList.toggle("bg-card2", !active);
+  });
+}
+
+async function selectMusicTab(id) {
+  highlightMusicTab(id);
+  $("musicWarn").classList.add("hidden");
+  $("musicItems").innerHTML = `<p class="text-gray-400 text-sm">Loading…</p>`;
+  const res = await api(`/api/music/items?collection=${encodeURIComponent(id)}`).catch(() => ({ ok: false }));
+  if (!res.ok) { $("musicItems").innerHTML = `<p class="text-red-400 text-sm">Failed to load.</p>`; return; }
+  if (res.warning) { $("musicWarn").textContent = "⚠ " + res.warning; $("musicWarn").classList.remove("hidden"); }
+  renderMusicItems(res.items || [], id);
+}
+
+function renderMusicItems(items, sourceId) {
+  const cont = $("musicItems");
+  cont.innerHTML = "";
+  if (!items.length) { cont.innerHTML = `<p class="text-gray-400 text-sm">No tracks found.</p>`; return; }
+  items.forEach((it) => {
+    const row = document.createElement("div");
+    row.className = "flex items-center justify-between gap-2 p-2 rounded bg-card2 border border-white/10";
+    const label = document.createElement("div");
+    label.className = "text-sm truncate flex-1";
+    label.textContent = it.artist ? `${it.artist} — ${it.title}` : it.title;
+    const prev = document.createElement("button");
+    prev.className = "px-2 py-1 text-xs rounded bg-bg2 border border-white/10 hover:bg-white/5 shrink-0";
+    prev.textContent = "▶";
+    prev.onclick = () => {
+      const a = $("musicAudio");
+      a.src = `/api/music/preview?id=${encodeURIComponent(it.id)}&url=${encodeURIComponent(it.url || "")}`;
+      a.play().catch(() => {});
+    };
+    const use = document.createElement("button");
+    use.className = "px-2 py-1 text-xs rounded btn-grad shrink-0";
+    use.textContent = "Use";
+    use.onclick = () => {
+      chosenMusic = { id: it.id, url: it.url || "", collection: sourceId === "curated" ? "" : sourceId, title: it.title, artist: it.artist || "" };
+      updateChosenMusic();
+      closeMusicModal();
+    };
+    row.appendChild(label); row.appendChild(prev); row.appendChild(use);
+    cont.appendChild(row);
+  });
+}
 
 function jobCard(j) {
   const pct = Math.max(0, Math.min(100, j.progress || 0));
@@ -109,7 +196,13 @@ $("submit").addEventListener("click", async () => {
     fd.append("gameId", $("game").value);
     fd.append("renderMode", $("renderMode").value);
     fd.append("format", $("format").value);
-    fd.append("musicSource", $("music").value);
+    if (chosenMusic) {
+      fd.append("musicId", chosenMusic.id || "");
+      fd.append("musicUrl", chosenMusic.url || "");
+      fd.append("musicCollection", chosenMusic.collection || "");
+      fd.append("musicTitle", chosenMusic.title || "");
+      fd.append("musicArtist", chosenMusic.artist || "");
+    }
     const res = await fetch("/api/jobs", { method: "POST", body: fd }).then((r) => r.json());
     if (res.error) { $("submitMsg").textContent = "Error: " + res.error; }
     else {
