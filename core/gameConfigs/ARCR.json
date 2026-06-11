@@ -1,0 +1,112 @@
+{
+  "id": "ARCR",
+  "name": "Arc Raiders",
+  "fps": 4,
+  "crops": {
+    "KillMessage": [
+      0.78,
+      0.02,
+      0.98,
+      0.28
+    ],
+    "StreakMessage": [
+      0.35,
+      0.1,
+      0.65,
+      0.2
+    ],
+    "GameResult": [
+      0.4,
+      0.22,
+      0.6,
+      0.36
+    ]
+  },
+  "windows": {
+    "killFuture": 2,
+    "squadFuture": 2,
+    "endGameFuture": 2,
+    "streakLookbehind": 0,
+    "streakLookahead": 8
+  },
+  "detectors": {
+    "kill": [
+      {
+        "event": "kill",
+        "match": [
+          "KILL",
+          "ELIMINATED"
+        ],
+        "score": 75
+      },
+      {
+        "event": "headshot",
+        "match": [
+          "HEADSHOT"
+        ],
+        "score": 75
+      }
+    ],
+    "streak": [
+      {
+        "event": "doubleKill",
+        "match": [
+          "DOUBLE"
+        ],
+        "score": 75
+      },
+      {
+        "event": "tripleKill",
+        "match": [
+          "TRIPLE"
+        ],
+        "score": 75
+      },
+      {
+        "event": "quadraKill",
+        "match": [
+          "QUAD",
+          "QUADRUPLE"
+        ],
+        "score": 75
+      },
+      {
+        "event": "reaperMode",
+        "match": [
+          "MULTI KILL",
+          "KILLING SPREE"
+        ],
+        "score": 75
+      }
+    ],
+    "squadWipe": [
+      {
+        "event": "squadWipe",
+        "match": [
+          "SQUAD WIPE",
+          "TEAM WIPE"
+        ],
+        "score": 75
+      }
+    ],
+    "endGame": [
+      {
+        "event": "victory",
+        "match": [
+          "VICTORY",
+          "WIN"
+        ],
+        "score": 70
+      },
+      {
+        "event": "defeat",
+        "match": [
+          "DEFEAT",
+          "LOSE"
+        ],
+        "score": 70
+      }
+    ]
+  },
+  "events": []
+}

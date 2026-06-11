@@ -193,7 +193,10 @@ async function prepareTools() {
   const python = await downloadPython();
   const ytdlp = await downloadYT_DLP();
 
-  const tools = { ffmpeg, python, ytdlp };
+  // ffprobe ships in the same bin/ folder as ffmpeg.exe
+  const ffprobe = path.join(path.dirname(ffmpeg), "ffprobe.exe");
+
+  const tools = { ffmpeg, ffprobe, python, ytdlp };
 
   global.TOOLS_READY = true;
   global.TOOLS = tools;

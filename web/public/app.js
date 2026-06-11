@@ -1,0 +1,131 @@
+// web/public/app.js — frontend for the cloud clipper
+const $ = (id) => document.getElementById(id);
+const api = (p, opt) => fetch(p, opt).then((r) => r.json());
+
+const STEP_LABEL = {
+  queued: "Queued", downloading: "Downloading VOD", analysing: "Analysing",
+  extract_audio: "Extracting audio", reading_audio: "Reading audio",
+  audio_analysis: "Audio analysis", fps_scanning: "Scanning for kills/deaths",
+  downloading_music: "Fetching music", rendering_montage: "Rendering montage",
+  rendering_clips: "Rendering clips", finalising: "Finalising", done: "Done", no_audio: "No audio (skipped)",
+};
+
+async function loadOptions() {
+  const games = await api("/api/games").catch(() => []);
+  const g = $("game");
+  g.innerHTML = '<option value="">Auto / none</option>' +
+    games.map((x) => `<option value="${x.id}">${x.name} (${x.id})</option>`).join("");
+
+  const sources = await api("/api/music/sources").catch(() => []);
+  $("music").innerHTML = '<option value="">None</option>' +
+    sources.map((s) => `<option value="${s.id}">${s.name}${s.creditRequired === false ? " (no credit)" : ""}</option>`).join("");
+
+  // Supporter links (configured via env on the server)
+  const support = await api("/api/support").catch(() => ({ links: [] }));
+  const el = $("supportLinks");
+  if (el) {
+    el.innerHTML = (support.links || []).map((l) =>
+      `<a href="${l.url}" target="_blank" rel="noopener" class="text-xs px-3 py-1.5 rounded-lg btn-grad font-semibold">${l.label}</a>`
+    ).join("") || '<span class="text-xs text-gray-500">(set SUPPORT_* env vars to add donate buttons)</span>';
+  }
+
+  syncVisibility();
+}
+
+function syncVisibility() {
+  const gaming = $("mode").value === "gaming";
+  const montage = $("renderMode").value === "montage";
+  $("gameWrap").style.opacity = gaming ? "1" : ".45";
+  $("game").disabled = !gaming;
+  $("musicWrap").style.display = montage ? "" : "none";
+}
+$("mode").addEventListener("change", syncVisibility);
+$("renderMode").addEventListener("change", syncVisibility);
+
+function jobCard(j) {
+  const pct = Math.max(0, Math.min(100, j.progress || 0));
+  const statusColor = j.status === "done" ? "text-green-400" : j.status === "error" ? "text-red-400" : "text-accent2";
+  const step = STEP_LABEL[j.step] || j.step || "";
+  const title = j.fileName || j.url || j.id;
+
+  const outputs = (j.outputs || []).map((o) =>
+    `<a class="inline-flex items-center gap-1 text-xs px-2 py-1 rounded bg-card2 border border-white/10 hover:bg-white/5 mr-2 mb-2"
+        href="/api/jobs/${j.id}/files/${encodeURIComponent(o.file)}" download>⬇ ${o.type}${o.tag ? " · " + o.tag : ""}</a>`
+  ).join("");
+
+  return `
+  <div class="glass border border-white/5 rounded-2xl p-4" data-id="${j.id}">
+    <div class="flex items-center justify-between gap-3">
+      <div class="min-w-0">
+        <div class="font-semibold truncate">${title}</div>
+        <div class="text-xs text-gray-400">${j.mode || ""}${j.gameId ? " · " + j.gameId : ""} · ${j.renderMode || ""}</div>
+      </div>
+      <div class="text-sm ${statusColor} shrink-0">${j.status === "queued" ? "Queued #" + (j.position || "?") : j.status}</div>
+    </div>
+    <div class="mt-3 h-2 rounded-full bg-card2 overflow-hidden">
+      <div class="bar h-full btn-grad" style="width:${pct}%"></div>
+    </div>
+    <div class="mt-1 text-xs text-gray-400">${step} ${pct ? "· " + pct + "%" : ""}</div>
+    ${j.error ? `<div class="mt-2 text-xs text-red-400">${j.error}</div>` : ""}
+    ${j.status === "done" ? `<div class="mt-2 text-xs text-gray-300">${j.highlightCount || 0} highlight(s)</div>` : ""}
+    ${outputs ? `<div class="mt-2">${outputs}</div>` : ""}
+    ${j.musicCredit ? `<div class="mt-1 text-[11px] text-gray-500 whitespace-pre-line">⚠ ${j.musicCredit}</div>` : ""}
+  </div>`;
+}
+
+const watching = new Set();
+function watch(id) {
+  if (watching.has(id)) return;
+  watching.add(id);
+  const es = new EventSource(`/api/jobs/${id}/events`);
+  es.onmessage = (e) => {
+    const j = JSON.parse(e.data);
+    const el = document.querySelector(`[data-id="${id}"]`);
+    if (el) el.outerHTML = jobCard(j);
+    if (j.status === "done" || j.status === "error") { es.close(); watching.delete(id); }
+  };
+  es.onerror = () => { es.close(); watching.delete(id); };
+}
+
+async function refresh() {
+  const jobs = await api("/api/jobs").catch(() => []);
+  jobs.reverse();
+  $("jobs").innerHTML = jobs.length ? jobs.map(jobCard).join("") : '<div class="text-gray-500 text-sm">No jobs yet.</div>';
+  jobs.forEach((j) => { if (j.status === "queued" || j.status === "running") watch(j.id); });
+}
+
+$("submit").addEventListener("click", async () => {
+  const url = $("url").value.trim();
+  const file = $("file").files[0];
+  if (!url && !file) { $("submitMsg").textContent = "Paste a URL or choose a file."; return; }
+
+  $("submit").disabled = true;
+  $("submitMsg").textContent = "Submitting…";
+  try {
+    const fd = new FormData();
+    if (url) fd.append("url", url);
+    if (file) fd.append("video", file);
+    fd.append("mode", $("mode").value);
+    fd.append("gameId", $("game").value);
+    fd.append("renderMode", $("renderMode").value);
+    fd.append("format", $("format").value);
+    fd.append("musicSource", $("music").value);
+    const res = await fetch("/api/jobs", { method: "POST", body: fd }).then((r) => r.json());
+    if (res.error) { $("submitMsg").textContent = "Error: " + res.error; }
+    else {
+      $("submitMsg").textContent = "Queued ✓";
+      $("url").value = ""; $("file").value = "";
+      await refresh();
+      watch(res.id);
+    }
+  } catch (e) {
+    $("submitMsg").textContent = "Failed: " + (e.message || e);
+  } finally {
+    $("submit").disabled = false;
+  }
+});
+
+$("refresh").addEventListener("click", refresh);
+loadOptions();
+refresh();
+setInterval(refresh, 15000);

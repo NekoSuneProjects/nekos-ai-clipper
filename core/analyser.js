@@ -71,6 +71,19 @@ async function extractAudioToWav(videoPath, outPath, onProgress = () => { }) {
 }
 
 
+// Does this file have an audio stream? (Video-only recordings don't, and
+// trying to extract a WAV from them makes ffmpeg fail with "Invalid argument".)
+async function hasAudioStream(videoPath) {
+  const tools = await prepareTools();
+  if (tools.ffprobe) ffmpeg.setFfprobePath(tools.ffprobe);
+  return new Promise((resolve) => {
+    ffmpeg.ffprobe(videoPath, (err, data) => {
+      if (err || !data || !Array.isArray(data.streams)) return resolve(false);
+      resolve(data.streams.some((s) => s.codec_type === "audio"));
+    });
+  });
+}
+
 async function readWavSamples(wavPath) {
   const buffer = fs.readFileSync(wavPath);
   const decoded = await WavDecoder.decode(buffer);
@@ -78,6 +91,13 @@ async function readWavSamples(wavPath) {
     samples: decoded.channelData[0],
     sampleRate: decoded.sampleRate
   };
+}
+
+function getPercentile(values, p) {
+  if (!values.length) return 0;
+  const sorted = values.slice().sort((a, b) => a - b);
+  const idx = Math.min(sorted.length - 1, Math.max(0, Math.floor(p * (sorted.length - 1))));
+  return sorted[idx];
 }
 
 // ------------------------------------------------------------
@@ -122,13 +142,14 @@ function analyseAudioReactions(samples, sampleRate, opts = {}, onProgress = () =
   // -----------------------------
   // PASS 2 — normalize RMS
   // -----------------------------
-  const maxRms = Math.max(...windows.map(w => w.rms));
-  if (maxRms <= 0) return [];
+  const rmsValues = windows.map((w) => w.rms);
+  const rmsScale = getPercentile(rmsValues, 0.95) || Math.max(...rmsValues);
+  if (rmsScale <= 0) return [];
 
   windows.forEach((w, i) => {
-    w.rmsNorm = w.rms / maxRms;
+    w.rmsNorm = w.rms / rmsScale;
+    if (w.rmsNorm > 1.5) w.rmsNorm = 1.5;
 
-    // 60% → 80%
     onProgress(30 + Math.floor((i / windows.length) * 20));
   });
 
@@ -150,9 +171,22 @@ function analyseAudioReactions(samples, sampleRate, opts = {}, onProgress = () =
   // PASS 4 — reaction logic
   // -----------------------------
   const flags = [];
-  const loudThreshold = 0.45;
-  const midThreshold = 0.25;
-  const deltaThreshold = 0.35;
+  const rmsNormValues = windows.map((w) => w.rmsNorm);
+  const noiseFloor = getPercentile(rmsNormValues, 0.2);
+
+  const loudThreshold = Math.max(
+    0.35,
+    getPercentile(rmsNormValues, 0.9),
+    noiseFloor + 0.2
+  );
+
+  const midThreshold = Math.max(
+    0.2,
+    getPercentile(rmsNormValues, 0.7),
+    noiseFloor + 0.1
+  );
+
+  const deltaThreshold = Math.max(0.2, getPercentile(deltaNorm, 0.85));
 
   for (let i = 0; i < windows.length; i++) {
     const w = windows[i];
@@ -223,7 +257,16 @@ function analyseAudioReactions(samples, sampleRate, opts = {}, onProgress = () =
 // ------------------------------------------------------------
 // Main analyser: mix audio reactions + FPS kills
 // ------------------------------------------------------------
-async function analyseVideo(videoPath, mode = "reaction", onProgress = () => { }) {
+async function analyseVideo(videoPath, mode = "reaction", options = {}, onProgress = () => { }) {
+  if (typeof options === "function") {
+    onProgress = options;
+    options = {};
+  }
+
+  const modeKey = typeof mode === "string" ? mode : "reaction";
+  const wantsAudio = modeKey === "reaction" || modeKey === "both";
+  const wantsFps = modeKey === "fps" || modeKey === "both" || modeKey.startsWith("fps_");
+
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "ai-clip-"));
   const wavOut = path.join(tmp, "audio.wav");
 
@@ -231,36 +274,52 @@ async function analyseVideo(videoPath, mode = "reaction", onProgress = () => { }
   let fpsHighlights = [];
 
   // ---------- STEP 1: AUDIO MODE ----------
-  if (mode === "reaction" || mode === "both") {
+  if (wantsAudio) {
+    const audioPresent = await hasAudioStream(videoPath);
 
-    onProgress({ step: "extract_audio", progress: 0 });
+    if (!audioPresent) {
+      // Video-only recording (no audio device was captured). Skip audio
+      // reactions gracefully instead of crashing the whole analysis.
+      console.warn("No audio stream found in", videoPath, "- skipping audio reactions.");
+      onProgress({ step: "no_audio", progress: 100 });
+      audioHighlights = [];
+    } else {
+      try {
+        onProgress({ step: "extract_audio", progress: 0 });
 
-    await extractAudioToWav(videoPath, wavOut, (p) => {
-      onProgress({ step: "extract_audio", progress: p });
-    });
+        await extractAudioToWav(videoPath, wavOut, (p) => {
+          onProgress({ step: "extract_audio", progress: p });
+        });
 
-    onProgress({ step: "extract_audio", progress: 100 });
+        onProgress({ step: "extract_audio", progress: 100 });
 
-    onProgress({ step: "reading_audio", progress: 0 });
-    const { samples, sampleRate } = await readWavSamples(wavOut);
-    onProgress({ step: "reading_audio", progress: 100 });
+        onProgress({ step: "reading_audio", progress: 0 });
+        const { samples, sampleRate } = await readWavSamples(wavOut);
+        onProgress({ step: "reading_audio", progress: 100 });
 
-    onProgress({ step: "audio_analysis", progress: 0 });
+        onProgress({ step: "audio_analysis", progress: 0 });
 
-    audioHighlights = analyseAudioReactions(
-      samples,
-      sampleRate,
-      {},
-      (p) => onProgress({ step: "audio_analysis", progress: p })
-    );
-    onProgress({ step: "audio_analysis", progress: 100 });
+        audioHighlights = analyseAudioReactions(
+          samples,
+          sampleRate,
+          {},
+          (p) => onProgress({ step: "audio_analysis", progress: p })
+        );
+        onProgress({ step: "audio_analysis", progress: 100 });
+      } catch (err) {
+        // Don't let an audio failure kill FPS detection in "both" mode.
+        console.warn("Audio analysis failed, continuing without it:", err && err.message);
+        onProgress({ step: "no_audio", progress: 100 });
+        audioHighlights = [];
+      }
+    }
   }
 
   // ---------- STEP 2: FPS MODE ----------
-  if (mode === "fps" || mode === "both") {
+  if (wantsFps) {
     onProgress({ step: "fps_scanning", progress: 0 });
 
-    fpsHighlights = await detectFPSKills(videoPath, (p) => {
+    fpsHighlights = await detectFPSKills(videoPath, { gameId: options.gameId }, (p) => {
       // receives % from FPS detector
       onProgress({ step: "fps_scanning", progress: p });
     });
