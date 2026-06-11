@@ -41,7 +41,6 @@ jobs:
         run: |
           if ("${{ github.ref_name }}" -eq "TESTING") {
             $channel = "beta"
-
             $tag = "BETA-${{ github.run_number }}"
             $version = "$($env:BASE_VERSION)-beta-${{ github.run_number }}"
             $name = "NekosAIClipper BETA V$($env:BASE_VERSION)-${{ github.run_number }}"
@@ -49,7 +48,6 @@ jobs:
           }
           else {
             $channel = "release"
-
             $tag = $env:BASE_VERSION
             $version = $env:BASE_VERSION
             $name = "NekosAIClipper $($env:BASE_VERSION)"
@@ -72,32 +70,38 @@ jobs:
         shell: pwsh
 
       # ==============================
-      # Generate Release Notes
+      # Clean up any existing release/draft for this tag
+      # (fixes "Validation Failed: tag_name already_exists" — release-drafter
+      #  used to leave a duplicate draft on the same tag).
       # ==============================
-      - name: Generate Release Notes
-        id: release_notes
-        uses: release-drafter/release-drafter@v6
+      - name: Remove stale releases for this tag
+        shell: pwsh
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          version: ${{ env.VERSION }}
-          tag: ${{ env.TAG }}
-          name: ${{ env.RELEASE_NAME }}
-
-      - name: Save Release Notes Locally
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "${{ steps.release_notes.outputs.body }}" > release_notes.txt
+          $tag = $env:TAG
+          Write-Host "Cleaning any existing releases for tag '$tag'..."
+          $ids = gh api --paginate "repos/${{ github.repository }}/releases" `
+                   --jq ".[] | select(.tag_name==`"$tag`") | .id"
+          foreach ($id in $ids) {
+            if ($id) {
+              gh api -X DELETE "repos/${{ github.repository }}/releases/$id"
+              Write-Host "Deleted release $id"
+            }
+          }
 
       # ==============================
-      # Create Release + Upload Assets
+      # Create Release + Upload Assets (auto-generated notes)
       # ==============================
       - name: Create Release and Upload Assets
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.TAG }}
+          target_commitish: ${{ github.sha }}
           name: ${{ env.RELEASE_NAME }}
-          body_path: release_notes.txt
+          generate_release_notes: true
           prerelease: ${{ env.PRERELEASE == 'true' }}
+          make_latest: ${{ env.PRERELEASE != 'true' }}
           files: |
             dist/NekosAIClipper-Setup-${{ env.BASE_VERSION }}.exe
             dist/NekosAIClipper-Setup-${{ env.BASE_VERSION }}.msi
@@ -105,27 +109,31 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # ==============================
-      # Discord Notify
+      # Discord Notify (notes fetched from the created release)
       # ==============================
       - name: Send Release Info to Discord
+        if: ${{ env.DISCORD_WEBHOOK != '' }}
         shell: pwsh
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          $notes = Get-Content release_notes.txt -Raw
+          $notes = gh release view "$env:TAG" --repo ${{ github.repository }} --json body --jq ".body"
+          if (-not $notes) { $notes = "New build available." }
+          if ($notes.Length -gt 1500) { $notes = $notes.Substring(0, 1500) + "..." }
 
-          $exeUrl = "https://github.com/${{ github.repository }}/releases/download/${{ env.TAG }}/NekosAIClipper-Setup-${{ env.BASE_VERSION }}.exe"
-          $msiUrl = "https://github.com/${{ github.repository }}/releases/download/${{ env.TAG }}/NekosAIClipper-Setup-${{ env.BASE_VERSION }}.msi"
+          $exeUrl = "https://github.com/${{ github.repository }}/releases/download/$($env:TAG)/NekosAIClipper-Setup-$($env:BASE_VERSION).exe"
+          $msiUrl = "https://github.com/${{ github.repository }}/releases/download/$($env:TAG)/NekosAIClipper-Setup-$($env:BASE_VERSION).msi"
 
           $json = @{
             username = "NekosAIClipper Bot"
-            content = "<@&1384262560395559122> **UPDATE ($($env:CHANNEL.ToUpper()))**"
+            content  = "<@&1384262560395559122> **UPDATE ($($env:CHANNEL.ToUpper()))**"
             embeds = @(
               @{
-                title = "NekosAIClipper $env:VERSION"
+                title       = "NekosAIClipper $env:VERSION"
                 description = "$notes`n`n[Download EXE]($exeUrl) | [Download MSI]($msiUrl)"
-                color = if ($env:CHANNEL -eq "beta") { 16750848 } else { 16776960 }
-                timestamp = (Get-Date).ToString("o")
+                color       = if ($env:CHANNEL -eq "beta") { 16750848 } else { 16776960 }
+                timestamp   = (Get-Date).ToString("o")
               }
             )
           } | ConvertTo-Json -Depth 10
