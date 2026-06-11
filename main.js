@@ -472,13 +472,29 @@ ipcMain.handle("video:renderStandard", async (event, payload) => {
 
 // Montage rendering
 ipcMain.handle("video:renderMontage", async (event, payload) => {
-  const { videoPath, highlights, musicPath, outputDir, format } = payload;
+  const { videoPath, highlights, musicPath, outputDir, format, musicCollection, musicTrack } = payload;
   const dir = outputDir || settings.get().outputDir;
   try {
-    const result = await require("./core/montageRenderer")
-      .renderMontage(videoPath, highlights, musicPath, dir, makeRenderProgress(event.sender), format || "both", settings.get().encoder || "auto");
+    // If a music SOURCE/track was chosen, build a bed that chains enough songs
+    // to cover the full montage (instead of looping one). A plain file (own
+    // upload) is used as-is.
+    let finalMusic = musicPath || null;
+    let musicCredit = null;
+    if (musicCollection || musicTrack) {
+      const totalSec = highlights.reduce((a, h) => a + Math.max(0, (h.endMs - h.startMs) / 1000), 0);
+      const m = await require("./core/musicLibrary").prepareMontageMusic(
+        { collectionId: musicCollection, track: musicTrack },
+        totalSec,
+        (p) => event.sender.send("render:progress", { step: "Fetching music", percent: Math.floor(p), etaSec: null })
+      );
+      finalMusic = m.path;
+      musicCredit = m.creditRequired === false ? null : m.attribution;
+    }
 
-    return { ok: true, ...result, outputDir: dir };
+    const result = await require("./core/montageRenderer")
+      .renderMontage(videoPath, highlights, finalMusic, dir, makeRenderProgress(event.sender), format || "both", settings.get().encoder || "auto");
+
+    return { ok: true, ...result, outputDir: dir, musicCredit };
   } catch (err) {
     return { ok: false, error: err.message };
   }
