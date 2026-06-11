@@ -9,11 +9,21 @@ function ensureDir(dir) {
   }
 }
 
-// Twitch example:
-// https://www.twitch.tv/videos/2626451997
+// Twitch VOD: https://www.twitch.tv/videos/2626451997
 function extractTwitchId(url) {
   const match = url.match(/twitch\.tv\/videos\/(\d+)/i);
   return match ? `twitch-${match[1]}` : null;
+}
+
+// Twitch CLIP:
+// https://clips.twitch.tv/WiseOptimisticPeppermintBuddhaBar-3u9argC8wcP6vb1A
+// https://www.twitch.tv/<channel>/clip/<slug>
+function extractTwitchClip(url) {
+  let m = url.match(/clips\.twitch\.tv\/([A-Za-z0-9_-]+)/i);
+  if (m) return `twitch-clip-${m[1]}`;
+  m = url.match(/twitch\.tv\/[^/]+\/clip\/([A-Za-z0-9_-]+)/i);
+  if (m) return `twitch-clip-${m[1]}`;
+  return null;
 }
 
 // YouTube example:
@@ -26,18 +36,25 @@ function extractYouTubeId(url) {
   return id ? `youtube-${id}` : null;
 }
 
-// Kick example:
-// https://kick.com/nekosunevr/videos/uuid-here
+// Kick VOD: https://kick.com/<channel>/videos/<uuid>
 function extractKickId(url) {
-  const match = url.match(/kick\.com\/[^/]+\/videos\/([a-f0-9-]{10,})/i);
+  const match = url.match(/kick\.com\/[^/]+\/videos\/([a-zA-Z0-9-]{10,})/i);
   return match ? `kick-${match[1]}` : null;
+}
+
+// Kick CLIP: https://kick.com/<channel>/clips/clip_<id>
+function extractKickClip(url) {
+  const m = url.match(/kick\.com\/[^/]+\/clips\/clip_([A-Za-z0-9]+)/i);
+  return m ? `kick-clip-${m[1]}` : null;
 }
 
 // WHITELIST resolver
 function resolveFilenamePrefix(url) {
   return (
     extractTwitchId(url) ||
+    extractTwitchClip(url) ||
     extractYouTubeId(url) ||
+    extractKickClip(url) ||
     extractKickId(url) ||
     null
   );
@@ -46,7 +63,7 @@ function resolveFilenamePrefix(url) {
 function detectPlatform(url) {
   const u = url.toLowerCase();
 
-  if (u.includes("twitch.tv")) return "twitch";
+  if (u.includes("twitch.tv")) return "twitch";   // covers clips.twitch.tv too
   if (u.includes("youtube.com") || u.includes("youtu.be")) return "youtube";
   if (u.includes("kick.com")) return "kick";
 
@@ -93,15 +110,18 @@ async function downloadVod(url, folder, onProgress = null) {
   // ---------------------------------------
   // Determine output name from whitelist
   // ---------------------------------------
-  const prefix = resolveFilenamePrefix(url);
-
   const platform = detectPlatform(url);
 
-  if (!prefix) {
-    reject(new Error(
-      "Unsupported platform. Only Twitch, YouTube, and Kick are allowed right now."
-    ));
+  // Gate on the platform (Twitch incl. clips / YouTube / Kick). Throw here — we
+  // are in an async function, NOT a Promise executor, so `reject` doesn't exist.
+  if (!platform) {
+    throw new Error(
+      "Unsupported platform. Only Twitch (videos + clips), YouTube, and Kick are supported."
+    );
   }
+
+  // Nice filename if we can derive one, otherwise a safe platform-stamped name.
+  const prefix = resolveFilenamePrefix(url) || `${platform}-${Date.now()}`;
 
   const addHeader = getPlatformHeaders(platform);
 

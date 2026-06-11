@@ -50,6 +50,18 @@ picker lists open windows — so selecting e.g. "PS Remote Play" already records
 - [ ] Optional: detect when the selected window is minimized/occluded and warn (gdigrab needs
       it visible).
 
+## 🎯 Robust cross-layout detection (streams + overlays)
+Streamers use different resolutions, HUD scales, and edge overlays/cams, so fixed
+tiny crops calibrated to one capture don't generalize. Strategy + TODO:
+- [x] FRTN now scans broad CENTRAL bands (callouts are center; overlays are at edges)
+      so it covers PS5/chiaki (right-side callouts) AND PC streams (center callouts).
+- [ ] Apply the same central-band approach to other battle-royale configs.
+- [ ] Generic engine "broadScan" flag: OCR a few standard central regions + match the
+      game's keywords anywhere, so a config works without per-layout tuning.
+- [ ] Calibration tool (the real fix): let users drag crop boxes on a frame per layout.
+- [ ] Longer term: template-match the callout icon, or a tiny ML text detector to LOCATE
+      the callout regardless of position (true "always find the text").
+
 ## 🔧 Detection accuracy (per-game configs)
 - [ ] Only a few `core/gameConfigs/*.json` have real, tuned crop coordinates + keywords.
       Build a **calibration tool**: extract a frame at a timestamp, overlay the crop rects,
