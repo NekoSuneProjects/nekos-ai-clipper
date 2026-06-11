@@ -5,7 +5,9 @@ name: Build & Publish Web Image (GHCR)
 
 on:
   push:
-    branches: [ "main", "master" ]
+    # GitHub runs a push-workflow from the branch that was pushed, so this must
+    # include the branches you actually use (you work on DEV/RELEASE, not main).
+    branches: [ "main", "master", "TESTING", "RELEASE" ]
     tags: [ "v*" ]
     # only rebuild when something the image depends on changes
     paths:
