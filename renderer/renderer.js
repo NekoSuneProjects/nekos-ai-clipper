@@ -152,6 +152,7 @@ function setActiveTab(tab) {
 
 // Global state
 let chosenMusic = null;
+let chosenMusicInfo = null; // { collection, track } for multi-song montage beds
 let currentVideoPath = null;
 let currentHighlights = [];
 let outputDir = null;
@@ -327,7 +328,9 @@ async function renderSelectedMontage() {
     highlights: selected,
     musicPath: chosenMusic || null,
     outputDir,
-    format: currentFormat()
+    format: currentFormat(),
+    musicCollection: chosenMusicInfo ? chosenMusicInfo.collection : null,
+    musicTrack: chosenMusicInfo ? chosenMusicInfo.track : null
   });
   finishRenderUI(res, [res.shortOut, res.normalOut]);
 }
@@ -463,6 +466,7 @@ musicBtn?.addEventListener("click", async () => {
   const file = await window.api.chooseMusic();
   if (file) {
     chosenMusic = file;
+    chosenMusicInfo = null; // own file → no source to chain from
     musicInfo.textContent = "Selected: " + file;
     const credit = document.getElementById("musicCredit");
     if (credit) credit.textContent = "";
@@ -588,6 +592,12 @@ async function useMusicItem(it, sourceId, btn) {
     });
     if (!res.ok) { btn.textContent = "✕"; btn.disabled = false; return; }
     chosenMusic = res.path;
+    // Remember the source + track so the montage can chain more songs from the
+    // same category if it runs longer than this one.
+    chosenMusicInfo = {
+      collection: sourceId === "curated" ? null : sourceId,
+      track: { id: it.id, url: it.url, title: it.title, artist: it.artist }
+    };
     musicInfo.textContent = `🎵 ${it.artist ? it.artist + " — " : ""}${it.title}`;
     if (creditEl) {
       creditEl.textContent = res.creditRequired === false

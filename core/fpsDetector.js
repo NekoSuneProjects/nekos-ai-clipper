@@ -358,11 +358,62 @@ function buildHighlight(type, timeMs, tag, killstreak, index) {
     id: "f_" + type + "_" + index,
     type: type,
     tag: tag,
+    tMs: timeMs,            // exact event time (used for kill clustering)
     startMs: startMs,
     endMs: endMs,
     killstreak: killstreak || 0,
     score: endMs - startMs
   };
+}
+
+// Merge consecutive KILLS into one continuous clip: if the player keeps killing
+// within `gapMs` of the last kill, the clip extends; once they stop killing for
+// `gapMs`, the clip ends (a few seconds after the final kill). This avoids 3
+// overlapping clips for a 3-kill streak that all repeat the same footage.
+const KILL_TYPES = ["kill", "killstreak", "headshot", "longshot"];
+
+function mergeKillClusters(highlights, gapMs = 15000, tailMs = 3000) {
+  const sorted = highlights.slice().sort((a, b) => a.startMs - b.startMs);
+  const out = [];
+  let cluster = null;
+
+  const flush = () => {
+    if (!cluster) return;
+    if (cluster.members.length === 1) {
+      out.push(cluster.members[0]); // lone kill — leave it untouched
+    } else {
+      const n = cluster.members.length;
+      const tag = n === 2 ? "DOUBLE KILL" : n === 3 ? "TRIPLE KILL" : n === 4 ? "QUAD KILL" : `MULTI KILL x${n}`;
+      out.push({
+        id: "cluster_" + Math.round(cluster.firstMs),
+        type: "killstreak",
+        tag,
+        tMs: cluster.lastKillMs,
+        startMs: Math.max(0, cluster.firstMs - PRE_PAD_MS),
+        endMs: cluster.lastKillMs + tailMs,         // end shortly after the LAST kill
+        killstreak: n,
+        score: (cluster.lastKillMs - cluster.firstMs) + n * 2000
+      });
+    }
+    cluster = null;
+  };
+
+  for (const h of sorted) {
+    const killTime = typeof h.tMs === "number" ? h.tMs : h.startMs + PRE_PAD_MS;
+    if (!KILL_TYPES.includes(h.type)) { flush(); out.push(h); continue; }
+
+    if (cluster && killTime - cluster.lastKillMs <= gapMs) {
+      cluster.lastKillMs = killTime;
+      cluster.members.push(h);
+    } else {
+      flush();
+      cluster = { firstMs: killTime, lastKillMs: killTime, members: [h] };
+    }
+  }
+  flush();
+
+  out.sort((a, b) => a.startMs - b.startMs);
+  return out;
 }
 
 // ------------------------------------------------------------
@@ -583,7 +634,9 @@ async function detectFPSKills(videoPath, options = {}, onProgress = () => {}) {
     }
   }
 
-  return highlights;
+  // Merge kill streaks into single continuous clips (configurable per game).
+  const gapMs = Number(game.killClusterGapMs) > 0 ? Number(game.killClusterGapMs) : 15000;
+  return mergeKillClusters(highlights, gapMs);
 }
 
 module.exports = { detectFPSKills, loadGameConfig };

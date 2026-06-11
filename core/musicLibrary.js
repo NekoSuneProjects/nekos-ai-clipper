@@ -11,7 +11,7 @@
 
 const fs = require("fs");
 const path = require("path");
-const { spawn } = require("child_process");
+const { spawn, execFile } = require("child_process");
 const { create: createYoutubeDl } = require("yt-dlp-exec");
 const { prepareTools, TOOLS_DIR } = require("../tools/toolsManager");
 
@@ -162,13 +162,21 @@ async function downloadTrack(track, onProgress = null) {
 
   let finalFile = outFile;
   if (!fs.existsSync(finalFile)) {
-    const mp3s = fs
+    // Never fall back to a *_preview.mp3 (those are 30s clips) — prefer the
+    // track id, else the newest FULL mp3.
+    const cands = fs
       .readdirSync(MUSIC_CACHE_DIR)
-      .filter((f) => f.toLowerCase().endsWith(".mp3"))
-      .map((f) => ({ f, t: fs.statSync(path.join(MUSIC_CACHE_DIR, f)).mtimeMs }))
-      .sort((a, b) => b.t - a.t);
-    if (!mp3s.length) throw new Error("Music download finished but no mp3 found.");
-    finalFile = path.join(MUSIC_CACHE_DIR, mp3s[0].f);
+      .filter((f) => f.toLowerCase().endsWith(".mp3") && !f.toLowerCase().endsWith("_preview.mp3"));
+    const byId = cands.find((f) => f === `${track.id}.mp3`) || cands.find((f) => f.startsWith(track.id + "."));
+    if (byId) {
+      finalFile = path.join(MUSIC_CACHE_DIR, byId);
+    } else {
+      const newest = cands
+        .map((f) => ({ f, t: fs.statSync(path.join(MUSIC_CACHE_DIR, f)).mtimeMs }))
+        .sort((a, b) => b.t - a.t)[0];
+      if (!newest) throw new Error("Music download finished but no mp3 found.");
+      finalFile = path.join(MUSIC_CACHE_DIR, newest.f);
+    }
   }
 
   return { path: finalFile, attribution, creditRequired: track.creditRequired !== false, cached: false, track };
@@ -263,6 +271,91 @@ async function getTrack(opts = {}, onProgress = null) {
   return res;
 }
 
+function audioDuration(ffprobe, file) {
+  return new Promise((resolve) => {
+    execFile(ffprobe, ["-v", "error", "-show_entries", "format=duration", "-of", "default=nw=1:nk=1", file],
+      (err, out) => resolve(err ? 0 : (parseFloat(String(out).trim()) || 0)));
+  });
+}
+
+// Concatenate songs into one bed with 2s crossfades between them.
+function concatWithCrossfade(ffmpeg, files, out) {
+  return new Promise((resolve, reject) => {
+    const inputs = files.flatMap((f) => ["-i", f]);
+    let filter;
+    if (files.length === 1) {
+      filter = "[0:a]aresample=44100[a]";
+    } else {
+      let prev = "[0:a]";
+      let chain = "";
+      for (let i = 1; i < files.length; i++) {
+        const lbl = i === files.length - 1 ? "[a]" : `[x${i}]`;
+        chain += `${prev}[${i}:a]acrossfade=d=2:c1=tri:c2=tri${lbl};`;
+        prev = `[x${i}]`;
+      }
+      filter = chain.replace(/;$/, "");
+    }
+    const args = ["-hide_banner", "-loglevel", "error", ...inputs,
+      "-filter_complex", filter, "-map", "[a]", "-c:a", "libmp3lame", "-q:a", "2", "-y", out];
+    execFile(ffmpeg, args, { maxBuffer: 1 << 24 }, (err) => err ? reject(err) : resolve(out));
+  });
+}
+
+// Build a music bed that COVERS targetSec: starts with the chosen/first track,
+// then appends more random tracks from the SAME source (crossfaded) until the
+// montage is fully covered. Returns { path, attribution, creditRequired, count }.
+async function prepareMontageMusic(opts = {}, targetSec = 0, onProgress = null) {
+  const tools = await prepareTools();
+  const collections = listCollections();
+  const col = opts.collectionId && opts.collectionId !== "curated"
+    ? collections.find((c) => c.id === opts.collectionId) : null;
+
+  // 1) First track: the one the user picked, else an auto pick from the source.
+  let first;
+  if (opts.track && (opts.track.id || opts.track.url)) {
+    first = await getTrack({ ...opts.track, collectionId: opts.collectionId }, onProgress);
+  } else {
+    first = await getAutoTrack({ collectionId: col ? opts.collectionId : undefined, seed: Date.now() }, onProgress);
+  }
+
+  const files = [first.path];
+  const used = new Set([first.track && first.track.id].filter(Boolean));
+  let total = await audioDuration(tools.ffprobe, first.path);
+
+  // 2) Keep adding songs from the same source until the montage is covered.
+  let guard = 0;
+  while (total < targetSec && guard < 15) {
+    guard++;
+    let next = null;
+    try {
+      next = col ? await getRandomFromCollection(col, Date.now() + guard * 7) : null;
+    } catch { next = null; }
+    if (!next) {
+      const tr = listTracks();
+      if (!tr.length) break;
+      next = tr[(Date.now() + guard) % tr.length];
+    }
+    if (used.has(next.id)) continue;
+    used.add(next.id);
+    try {
+      const dl = await downloadTrack({ ...next, collectionId: opts.collectionId }, onProgress);
+      files.push(dl.path);
+      total += await audioDuration(tools.ffprobe, dl.path);
+    } catch { /* skip a failed track */ }
+  }
+
+  const creditRequired = first.creditRequired !== false;
+  const attribution = creditRequired ? first.attribution : null;
+
+  if (files.length === 1) {
+    return { path: files[0], attribution, creditRequired, count: 1 };
+  }
+
+  const bed = path.join(MUSIC_CACHE_DIR, `bed_${Date.now()}.mp3`);
+  await concatWithCrossfade(tools.ffmpeg, files, bed);
+  return { path: bed, attribution, creditRequired, count: files.length };
+}
+
 module.exports = {
   listTracks,
   listCollections,
@@ -271,6 +364,7 @@ module.exports = {
   getAutoTrack,
   getTrack,
   previewTrack,
+  prepareMontageMusic,
   attributionFor,
   MUSIC_CACHE_DIR
 };

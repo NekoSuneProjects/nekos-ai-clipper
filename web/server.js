@@ -75,20 +75,19 @@ async function processJob(job, onProgress) {
     onProgress({ step: "rendering_montage", progress: 0 });
     let musicPath = null;
     const onMusicProg = (p) => onProgress({ step: "downloading_music", progress: Math.floor(p) });
+    // Montage length → chain enough songs from the source to cover it.
+    const montageSec = highlights.reduce((a, h) => a + Math.max(0, (h.endMs - h.startMs) / 1000), 0);
     try {
-      if (job.musicId || job.musicUrl) {
-        // A specific track was picked
-        const m = await musicLibrary.getTrack(
-          { id: job.musicId, url: job.musicUrl, collectionId: job.musicCollection, title: job.musicTitle, artist: job.musicArtist },
-          onMusicProg
-        );
+      if (job.musicId || job.musicUrl || job.musicSource) {
+        const m = await musicLibrary.prepareMontageMusic({
+          collectionId: job.musicCollection || job.musicSource || null,
+          track: (job.musicId || job.musicUrl)
+            ? { id: job.musicId, url: job.musicUrl, title: job.musicTitle, artist: job.musicArtist }
+            : null
+        }, montageSec, onMusicProg);
         musicPath = m.path;
         job.musicCredit = m.creditRequired === false ? null : m.attribution;
-      } else if (job.musicSource) {
-        // Just a source → random auto-pick
-        const m = await musicLibrary.getAutoTrack({ collectionId: job.musicSource, seed: Date.now() }, onMusicProg);
-        musicPath = m.path;
-        job.musicCredit = m.creditRequired === false ? null : m.attribution;
+        job.musicCount = m.count;
       }
     } catch (e) {
       job.musicError = String(e.message || e);
