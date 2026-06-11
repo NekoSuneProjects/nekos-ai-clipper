@@ -1,0 +1,201 @@
+{
+  "id": "FRTN",
+  "name": "Fortnite",
+  "fps": 2,
+  "_calibration": "Calibrated against ChisdealHDYT's PS5 (chiaki-ng) 1920x1026 footage on 2026-06-11. Crops target Fortnite's PERSONAL kill callouts (which only show when YOU get the kill), not the lobby feed. ocrThreshold binarizes the crop so the stylized italic font reads. Coords are fractions [x1,y1,x2,y2]. If your HUD scale/resolution differs, retune via the calibration tool.",
+  "ocrThreshold": 185,
+  "crops": {
+    "ElimBanner": [
+      0.56,
+      0.24,
+      0.87,
+      0.58
+    ],
+    "MultiKill": [
+      0.33,
+      0.58,
+      0.67,
+      0.78
+    ],
+    "GameResult": [
+      0.28,
+      0.10,
+      0.72,
+      0.40
+    ]
+  },
+  "windows": {
+    "killFuture": 1,
+    "squadFuture": 1,
+    "endGameFuture": 1,
+    "streakLookbehind": 0,
+    "streakLookahead": 8
+  },
+  "deathWords": [
+    "YOU PLACED",
+    "PLACED #",
+    "KNOCKED OUT"
+  ],
+  "detectors": {
+    "kill": [
+      { "event": "kill", "crop": "ElimBanner", "match": ["ENEMY ELIMINATED", "ELIMINATION", "ELIMINATED"], "score": 70 },
+      { "event": "knockDown", "crop": "ElimBanner", "match": ["KNOCKED"], "score": 62 }
+    ],
+    "streak": [
+      { "event": "doubleKill", "crop": "MultiKill", "match": ["DOUBLE ELIM", "DOUBLE"], "score": 64 },
+      { "event": "tripleKill", "crop": "MultiKill", "match": ["TRIPLE ELIM", "TRIPLE"], "score": 64 }
+    ],
+    "squadWipe": [
+      { "event": "squadWipe", "crop": "MultiKill", "match": ["ENEMY TEAM WIPED", "TEAM WIPED"], "score": 64 }
+    ],
+    "endGame": [
+      { "event": "victory", "crop": "GameResult", "match": ["VICTORY ROYALE", "#1 VICTORY", "VICTORY"], "score": 72 }
+    ]
+  },
+  "events": [
+    {
+      "name": "victory",
+      "displayName": "Victory",
+      "icon": "overall-victory",
+      "default": true,
+      "tooltip": "When you achieve a Victory Royale.",
+      "eventScore": 40,
+      "instruction": "* Streamer achieve a Victory Royale *",
+      "automontage": {
+        "primary": false,
+        "secondary": true,
+        "offsetBefore": 3,
+        "offsetAfter": 3,
+        "effectTypes": []
+      }
+    },
+    {
+      "name": "victoryCrowned",
+      "displayName": "Crowned Victory",
+      "icon": "round-victory",
+      "default": true,
+      "tooltip": "When you achieve a Victory Royale with the crown.",
+      "eventScore": 50,
+      "instruction": "* Streamer achieve a Victory Royale with the crown *",
+      "automontage": {
+        "primary": false,
+        "secondary": true,
+        "offsetBefore": 3,
+        "offsetAfter": 3,
+        "effectTypes": []
+      }
+    },
+    {
+      "name": "kill",
+      "displayName": "Kill",
+      "icon": "fps-kill",
+      "default": true,
+      "tooltip": "When you kill an opponent.",
+      "eventScore": 20,
+      "instruction": "* Streamer kill an opponent *",
+      "automontage": {
+        "primary": true,
+        "secondary": false,
+        "offsetBefore": 2,
+        "offsetAfter": 2,
+        "effectTypes": [
+          "greyDistortionArrow",
+          "veryFastThenSlow",
+          "fastThenSlow",
+          "flashScope",
+          "slowFastSlow",
+          "lensShake",
+          "backToColor"
+        ]
+      }
+    },
+    {
+      "name": "knockDown",
+      "displayName": "Knock Down",
+      "icon": "brawl-kill",
+      "default": true,
+      "tooltip": "When you knock down an opponent.",
+      "eventScore": 5,
+      "instruction": "* Streamer knock down an opponent *",
+      "automontage": {
+        "primary": true,
+        "secondary": false,
+        "offsetBefore": 2,
+        "offsetAfter": 2,
+        "effectTypes": [
+          "greyDistortionArrow",
+          "veryFastThenSlow",
+          "fastThenSlow",
+          "flashScope",
+          "slowFastSlow",
+          "lensShake",
+          "backToColor"
+        ]
+      }
+    },
+    {
+      "name": "busJump",
+      "displayName": "Battle Bus Jump",
+      "icon": "free-fall",
+      "default": true,
+      "tooltip": "When you jump from the bus.",
+      "eventScore": 5,
+      "instruction": "* Streamer jump from the bus *",
+      "automontage": {
+        "primary": false,
+        "secondary": false,
+        "offsetBefore": 0,
+        "offsetAfter": 0,
+        "effectTypes": []
+      }
+    },
+    {
+      "name": "endGame",
+      "displayName": "End Game Ranking",
+      "icon": "generic-event",
+      "default": true,
+      "tooltip": "When the game is over.",
+      "eventScore": 5,
+      "instruction": "* Streamer is killed *",
+      "automontage": {
+        "primary": false,
+        "secondary": false,
+        "offsetBefore": 0,
+        "offsetAfter": 0,
+        "effectTypes": []
+      }
+    },
+    {
+      "name": "top5",
+      "displayName": "Player end in top 5",
+      "icon": "top-5",
+      "default": true,
+      "tooltip": "When the player end the game in the top 5.",
+      "eventScore": 35,
+      "instruction": "* Streamer is killed *",
+      "automontage": {
+        "primary": true,
+        "secondary": false,
+        "offsetBefore": 0,
+        "offsetAfter": 0,
+        "effectTypes": []
+      }
+    },
+    {
+      "name": "top10",
+      "displayName": "Player end in top 10",
+      "icon": "top10",
+      "default": true,
+      "tooltip": "When the player end the game in the top 10.",
+      "eventScore": 30,
+      "instruction": "* Streamer is killed *",
+      "automontage": {
+        "primary": true,
+        "secondary": false,
+        "offsetBefore": 0,
+        "offsetAfter": 0,
+        "effectTypes": []
+      }
+    }
+  ]
+}

@@ -1,0 +1,122 @@
+{
+  "id": "SF6",
+  "name": "Street Fighter 6",
+  "fps": 2,
+  "crops": {
+    "YouLeft": [
+      0.104,
+      0.06,
+      0.13,
+      0.087
+    ],
+    "YouRight": [
+      0.87,
+      0.06,
+      0.896,
+      0.087
+    ],
+    "WinLeft": [
+      0.419,
+      0.769,
+      0.466,
+      0.815
+    ],
+    "ComboLeft": [
+      0.02,
+      0.35,
+      0.071,
+      0.425
+    ],
+    "ComboRight": [
+      0.895,
+      0.35,
+      0.947,
+      0.425
+    ]
+  },
+  "windows": {
+    "killFuture": 2,
+    "squadFuture": 2,
+    "endGameFuture": 2,
+    "streakLookbehind": 0,
+    "streakLookahead": 8
+  },
+  "detectors": {
+    "kill": [],
+    "streak": [],
+    "squadWipe": [],
+    "endGame": []
+  },
+  "events": [
+    {
+      "name": "victory",
+      "displayName": "Victory",
+      "icon": "overall-victory",
+      "default": true,
+      "tooltip": "When you win the match.",
+      "eventScore": 15,
+      "instruction": "* Streamer win the match *",
+      "automontage": {
+        "primary": true,
+        "secondary": true,
+        "offsetBefore": 8,
+        "offsetAfter": 3,
+        "effectTypes": [
+          "lensShake"
+        ]
+      }
+    },
+    {
+      "name": "defeat",
+      "displayName": "Defeat",
+      "icon": "overall-lose",
+      "default": false,
+      "tooltip": "When you lose the match.",
+      "eventScore": 5,
+      "instruction": "* Streamer lose the match *",
+      "automontage": {
+        "primary": false,
+        "secondary": true,
+        "offsetBefore": 3,
+        "offsetAfter": 3,
+        "effectTypes": []
+      }
+    },
+    {
+      "name": "criticalDamage",
+      "displayName": "Critical damage",
+      "icon": "burst",
+      "default": true,
+      "tooltip": "When you do a nice amount of damage.",
+      "eventScore": 20,
+      "instruction": "* Streamer does damage *",
+      "automontage": {
+        "primary": true,
+        "secondary": true,
+        "offsetBefore": 3,
+        "offsetAfter": 3,
+        "effectTypes": [
+          "dejavu"
+        ]
+      }
+    },
+    {
+      "name": "combo10Plus",
+      "displayName": "Big hit combo",
+      "icon": "top10",
+      "default": true,
+      "tooltip": "When you do 10 or more hits combo.",
+      "eventScore": 15,
+      "instruction": "* Streamer does damage *",
+      "automontage": {
+        "primary": true,
+        "secondary": true,
+        "offsetBefore": 3,
+        "offsetAfter": 3,
+        "effectTypes": [
+          "SF6greyDistortionArrow"
+        ]
+      }
+    }
+  ]
+}

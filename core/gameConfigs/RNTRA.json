@@ -1,0 +1,69 @@
+{
+  "id": "RNTRA",
+  "name": "RNTRA",
+  "fps": 2,
+  "crops": {},
+  "windows": {
+    "killFuture": 2,
+    "squadFuture": 2,
+    "endGameFuture": 2,
+    "streakLookbehind": 0,
+    "streakLookahead": 8
+  },
+  "detectors": {
+    "kill": [],
+    "streak": [],
+    "squadWipe": [],
+    "endGame": []
+  },
+  "events": [
+    {
+      "name": "pvpVictory",
+      "displayName": "PVP Victory",
+      "icon": "overall-victory",
+      "default": true,
+      "tooltip": "When you win a game.",
+      "eventScore": 15,
+      "instruction": "* Streamer win a game *",
+      "automontage": {
+        "primary": false,
+        "secondary": false,
+        "offsetBefore": 0,
+        "offsetAfter": 0,
+        "effectTypes": []
+      }
+    },
+    {
+      "name": "pvpDefeat",
+      "displayName": "PVP Defeat",
+      "icon": "overall-lose",
+      "tooltip": "When you lose a game.",
+      "eventScore": 5,
+      "instruction": "* Streamer lose a game *",
+      "default": false,
+      "automontage": {
+        "primary": false,
+        "secondary": false,
+        "offsetBefore": 0,
+        "offsetAfter": 0,
+        "effectTypes": []
+      }
+    },
+    {
+      "name": "pveVictory",
+      "displayName": "PVE Victory",
+      "icon": "generic-event",
+      "tooltip": "When you win a game.",
+      "eventScore": 15,
+      "instruction": "* Streamer win a pve game *",
+      "default": false,
+      "automontage": {
+        "primary": false,
+        "secondary": false,
+        "offsetBefore": 0,
+        "offsetAfter": 0,
+        "effectTypes": []
+      }
+    }
+  ]
+}

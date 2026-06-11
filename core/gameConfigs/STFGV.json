@@ -1,0 +1,67 @@
+{
+  "id": "STFGV",
+  "name": "STFGV",
+  "fps": 2,
+  "crops": {},
+  "windows": {
+    "killFuture": 2,
+    "squadFuture": 2,
+    "endGameFuture": 2,
+    "streakLookbehind": 0,
+    "streakLookahead": 8
+  },
+  "detectors": {
+    "kill": [],
+    "streak": [],
+    "squadWipe": [],
+    "endGame": []
+  },
+  "events": [
+    {
+      "name": "victory",
+      "displayName": "Victory",
+      "icon": "overall-victory",
+      "default": true,
+      "tooltip": "When you win the match.",
+      "eventScore": 15,
+      "instruction": "* Streamer win the match *",
+      "automontage": {
+        "primary": false,
+        "secondary": true,
+        "offsetBefore": 3,
+        "offsetAfter": 3,
+        "effectTypes": []
+      }
+    },
+    {
+      "name": "comboStreakLeft",
+      "displayName": "Combo Streak Left",
+      "icon": "generic-event",
+      "default": true,
+      "eventScore": 10,
+      "instruction": "* Streamer performs a combo streak left *",
+      "automontage": {
+        "primary": false,
+        "secondary": false,
+        "offsetBefore": 0,
+        "offsetAfter": 0,
+        "effectTypes": []
+      }
+    },
+    {
+      "name": "comboStreakRight",
+      "displayName": "Combo Streak Right",
+      "icon": "generic-event",
+      "default": true,
+      "eventScore": 10,
+      "instruction": "* Streamer performs a combo streak right *",
+      "automontage": {
+        "primary": false,
+        "secondary": false,
+        "offsetBefore": 0,
+        "offsetAfter": 0,
+        "effectTypes": []
+      }
+    }
+  ]
+}

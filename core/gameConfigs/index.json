@@ -1,0 +1,186 @@
+[
+  {
+    "id": "AMNGU",
+    "name": "Among Us"
+  },
+  {
+    "id": "APXL",
+    "name": "Apex Legends"
+  },
+  {
+    "id": "BF6",
+    "name": "Battlefield 6"
+  },
+  {
+    "id": "BMW",
+    "name": "Black Myth: Wukong"
+  },
+  {
+    "id": "CHVL2",
+    "name": "Chivalry 2"
+  },
+  {
+    "id": "COD6Z",
+    "name": "Call of Duty: Black Ops 6 - Zombies"
+  },
+  {
+    "id": "CODBO6",
+    "name": "Call of Duty: Black Ops 6"
+  },
+  {
+    "id": "CODMW2",
+    "name": "Call of Duty: Modern Warfare II"
+  },
+  {
+    "id": "CODMW3",
+    "name": "Call of Duty: Modern Warfare III"
+  },
+  {
+    "id": "CODVANG",
+    "name": "Call of Duty: Vanguard"
+  },
+  {
+    "id": "CODWZ4",
+    "name": "Call of Duty: Warzone"
+  },
+  {
+    "id": "CS2",
+    "name": "Counter-Strike 2"
+  },
+  {
+    "id": "CUPHD",
+    "name": "Cuphead"
+  },
+  {
+    "id": "DES2",
+    "name": "Destiny 2"
+  },
+  {
+    "id": "DIABLO4",
+    "name": "Diablo IV"
+  },
+  {
+    "id": "DRIL",
+    "name": "DRIL"
+  },
+  {
+    "id": "FINALS",
+    "name": "The Finals"
+  },
+  {
+    "id": "FLLG",
+    "name": "Fall Guys"
+  },
+  {
+    "id": "FRTN",
+    "name": "Fortnite"
+  },
+  {
+    "id": "HALOINF",
+    "name": "Halo Infinite"
+  },
+  {
+    "id": "HLDV2",
+    "name": "Helldivers 2"
+  },
+  {
+    "id": "HRTS",
+    "name": "Hearthstone"
+  },
+  {
+    "id": "LDNRG",
+    "name": "Elden Ring"
+  },
+  {
+    "id": "LOL",
+    "name": "League of Legends"
+  },
+  {
+    "id": "LOLTFT",
+    "name": "Teamfight Tactics (TFT)"
+  },
+  {
+    "id": "MAD24",
+    "name": "Madden NFL 24"
+  },
+  {
+    "id": "MHW",
+    "name": "Monster Hunter: World"
+  },
+  {
+    "id": "MR",
+    "name": "Marvel Rivals"
+  },
+  {
+    "id": "MTGA",
+    "name": "Magic: The Gathering Arena"
+  },
+  {
+    "id": "NARAKA",
+    "name": "Naraka: Bladepoint"
+  },
+  {
+    "id": "OSKR",
+    "name": "Omega Strikers"
+  },
+  {
+    "id": "POE2",
+    "name": "Path of Exile 2"
+  },
+  {
+    "id": "PUBG",
+    "name": "PUBG: Battlegrounds"
+  },
+  {
+    "id": "RCKTL",
+    "name": "Rocket League"
+  },
+  {
+    "id": "RMNT2",
+    "name": "Remnant II"
+  },
+  {
+    "id": "RNTRA",
+    "name": "RNTRA"
+  },
+  {
+    "id": "SF6",
+    "name": "Street Fighter 6"
+  },
+  {
+    "id": "SMITE2",
+    "name": "Smite 2"
+  },
+  {
+    "id": "SNB",
+    "name": "Skull and Bones"
+  },
+  {
+    "id": "STBG",
+    "name": "Stumble Guys"
+  },
+  {
+    "id": "STFGV",
+    "name": "STFGV"
+  },
+  {
+    "id": "SVRS",
+    "name": "SVRS"
+  },
+  {
+    "id": "TFD",
+    "name": "The First Descendant"
+  },
+  {
+    "id": "VLRNT",
+    "name": "Valorant"
+  },
+  {
+    "id": "XDEF",
+    "name": "XDefiant"
+  },
+  {
+    "id": "BF6_CONSOLE",
+    "name": "Battlefield 6 (Console)"
+  }
+]

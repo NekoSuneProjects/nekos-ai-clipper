@@ -1,0 +1,104 @@
+{
+  "id": "CODMW3",
+  "name": "Call of Duty: Modern Warfare III",
+  "fps": 2,
+  "crops": {},
+  "windows": {
+    "killFuture": 2,
+    "squadFuture": 2,
+    "endGameFuture": 2,
+    "streakLookbehind": 0,
+    "streakLookahead": 8
+  },
+  "detectors": {
+    "kill": [],
+    "streak": [],
+    "squadWipe": [],
+    "endGame": []
+  },
+  "events": [
+    {
+      "name": "victory",
+      "displayName": "Victory",
+      "icon": "overall-victory",
+      "default": true,
+      "tooltip": "When you win a game.",
+      "eventScore": 15,
+      "automontage": {
+        "primary": false,
+        "secondary": true,
+        "offsetBefore": 3,
+        "offsetAfter": 3,
+        "effectTypes": []
+      }
+    },
+    {
+      "name": "defeat",
+      "displayName": "Defeat",
+      "icon": "overall-lose",
+      "default": false,
+      "tooltip": "When you lose a game.",
+      "eventScore": 5,
+      "automontage": {
+        "primary": false,
+        "secondary": false,
+        "offsetBefore": 0,
+        "offsetAfter": 0,
+        "effectTypes": []
+      }
+    },
+    {
+      "name": "kill",
+      "displayName": "Kill",
+      "icon": "fps-kill",
+      "default": true,
+      "tooltip": "When you kill an opponent.",
+      "eventScore": 10,
+      "automontage": {
+        "primary": true,
+        "secondary": false,
+        "offsetBefore": 2,
+        "offsetAfter": 2,
+        "effectTypes": [
+          "greyDistortionArrow",
+          "veryFastThenSlow",
+          "fastThenSlow",
+          "flashScope",
+          "slowFastSlow",
+          "lensShake",
+          "backToColor"
+        ]
+      }
+    },
+    {
+      "name": "death",
+      "displayName": "Death",
+      "icon": "death",
+      "default": false,
+      "tooltip": "When you die in combat.",
+      "eventScore": 0,
+      "automontage": {
+        "primary": false,
+        "secondary": false,
+        "offsetBefore": 0,
+        "offsetAfter": 0,
+        "effectTypes": []
+      }
+    },
+    {
+      "name": "recap",
+      "displayName": "Game summary",
+      "icon": "generic-event",
+      "default": true,
+      "tooltip": "Your game summary",
+      "eventScore": 5,
+      "automontage": {
+        "primary": false,
+        "secondary": false,
+        "offsetBefore": 0,
+        "offsetAfter": 0,
+        "effectTypes": []
+      }
+    }
+  ]
+}
