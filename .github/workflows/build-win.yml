@@ -162,22 +162,41 @@ jobs:
         run: |
           $repo  = "${{ github.repository }}"
           $owner = "${{ github.repository_owner }}"
-          $tick  = '`'   # literal backtick for inline-code fields
+          $tick  = '`'   # literal backtick for inline-code
 
+          # --- Release notes, cleaned for Discord --------------------------------
           $notes = gh release view "$env:TAG" --repo $repo --json body --jq ".body"
           if (-not $notes) { $notes = "_No release notes._" }
-          if ($notes.Length -gt 1600) { $notes = $notes.Substring(0, 1600) + " …" }
+          # Strip GitHub auto-notes clutter so it reads like clean prose
+          $notes = $notes -replace "(?im)^\s*#{1,6}\s*", ""                 # markdown headings
+          $notes = $notes -replace "(?im)^\s*what's changed\s*$", ""        # boilerplate header
+          $notes = $notes -replace "in https?://github\.com/[^/\s]+/[^/\s]+/pull/(\d+)", "(#`$1)"  # PR url -> (#N)
+          $notes = $notes -replace "(?im)^\s*\*\*full changelog\*\*:.*$", "" # drop changelog line (we link Compare)
+          $notes = $notes -replace "(?m)^\s*[\*\-]\s+", "• "                 # bullets -> •
+          $notes = ($notes -split "`n" | Where-Object { $_.Trim() -ne "" }) -join "`n"
+          $notes = $notes.Trim()
+          if (-not $notes) { $notes = "_No release notes._" }
+          if ($notes.Length -gt 3200) { $notes = $notes.Substring(0, 3200) + " …" }
 
+          # --- Links + metadata ---------------------------------------------------
           $releaseUrl = "https://github.com/$repo/releases/tag/$($env:TAG)"
           $exeUrl     = "https://github.com/$repo/releases/download/$($env:TAG)/NekosAIClipper-Setup-$($env:BASE_VERSION).exe"
           $msiUrl     = "https://github.com/$repo/releases/download/$($env:TAG)/NekosAIClipper-Setup-$($env:BASE_VERSION).msi"
           $compareUrl = if ($env:PREV_TAG) { "https://github.com/$repo/compare/$($env:PREV_TAG)...$($env:TAG)" } else { $releaseUrl }
-
-          $prevField  = if ($env:PREV_TAG) { "$tick$($env:PREV_TAG)$tick" } else { "—" }
-          $filesField = "$($env:FILES_CHANGED) • +$($env:ADDS) / -$($env:DELS)"
+          $prevDisp   = if ($env:PREV_TAG) { "$tick$($env:PREV_TAG)$tick" } else { "—" }
           $isBeta     = ($env:CHANNEL -eq "beta")
 
-          $desc = "**Release notes**`n$notes`n`n📥 [Download EXE]($exeUrl) • [Download MSI]($msiUrl)`n🔗 [Release]($releaseUrl) • [Compare]($compareUrl)"
+          # --- Description: tidy metadata lines at the top (like the reference) ----
+          $desc = @(
+            "**Tag** $tick$($env:TAG)$tick"
+            "**Previous** $prevDisp"
+            "**Commits** $($env:COMMIT_COUNT)"
+            "**Files** $($env:FILES_CHANGED) • +$($env:ADDS) / -$($env:DELS)"
+            "📦 [Release]($releaseUrl) • 🔀 [Compare]($compareUrl) • 📥 [EXE]($exeUrl) • [MSI]($msiUrl)"
+            ""
+            "**Release notes**"
+            $notes
+          ) -join "`n"
 
           $payload = @{
             username   = "NekosAIClipper Releases"
@@ -189,16 +208,10 @@ jobs:
                 title       = $env:RELEASE_NAME
                 url         = $releaseUrl
                 description = $desc
-                color       = if ($isBeta) { 16750848 } else { 5763719 }
+                color       = if ($isBeta) { 11823359 } else { 8150271 }   # purple bar (beta brighter)
                 thumbnail   = @{ url = "https://github.com/$owner.png" }
-                fields = @(
-                  @{ name = "Tag";      value = "$tick$($env:TAG)$tick"; inline = $true }
-                  @{ name = "Previous"; value = $prevField;              inline = $true }
-                  @{ name = "Commits";  value = "$($env:COMMIT_COUNT)";  inline = $true }
-                  @{ name = "Files";    value = $filesField;             inline = $true }
-                )
-                footer    = @{ text = "$repo • $($env:CHANNEL)" }
-                timestamp = (Get-Date).ToString("o")
+                footer      = @{ text = "$repo • $($env:CHANNEL)" }
+                timestamp   = (Get-Date).ToString("o")
               }
             )
             allowed_mentions = @{ parse = @("roles") }
