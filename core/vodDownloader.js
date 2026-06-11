@@ -70,28 +70,18 @@ function detectPlatform(url) {
   return null; // not allowed
 }
 
+// A realistic modern Chrome UA (the old one had a stray quote + was incomplete,
+// which Cloudflare flags). Only used when NOT impersonating.
+const BROWSER_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
+
 function getPlatformHeaders(platform) {
   switch (platform) {
     case "twitch":
-      return [
-        "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64)'",
-        "Referer: https://www.twitch.tv/",
-        "Origin: https://www.twitch.tv"
-      ];
-
+      return [`User-Agent: ${BROWSER_UA}`, "Referer: https://www.twitch.tv/", "Origin: https://www.twitch.tv"];
     case "youtube":
-      return [
-        "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64)'",
-        "Referer: https://www.youtube.com/",
-        "Origin: https://www.youtube.com"
-      ];
-
+      return [`User-Agent: ${BROWSER_UA}`, "Referer: https://www.youtube.com/", "Origin: https://www.youtube.com"];
     case "kick":
-      return [
-        "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64)'",
-        "Referer: https://kick.com/",
-        "Origin: https://kick.com"
-      ];
+      return [`User-Agent: ${BROWSER_UA}`, "Referer: https://kick.com/", "Origin: https://kick.com"];
   }
 
   return [];
@@ -123,8 +113,6 @@ async function downloadVod(url, folder, onProgress = null) {
   // Nice filename if we can derive one, otherwise a safe platform-stamped name.
   const prefix = resolveFilenamePrefix(url) || `${platform}-${Date.now()}`;
 
-  const addHeader = getPlatformHeaders(platform);
-
   const outputTemplate = path.join(folder, `${prefix}.%(ext)s`);
 
   const args = {
@@ -137,9 +125,20 @@ async function downloadVod(url, folder, onProgress = null) {
     restrictFilenames: false,
     noWarnings: true,
     noCheckCertificates: true,
-    addHeader,
     progress: true
   };
+
+  // Browser impersonation defeats Cloudflare 403s (Kick especially) on hosts
+  // whose yt-dlp lacks the latest extractor signatures — e.g. the Linux/Pi
+  // Docker. Enabled via env (the Dockerfile installs curl_cffi + sets it). When
+  // impersonating, DON'T also send a manual User-Agent (it breaks the TLS/UA
+  // fingerprint match); otherwise fall back to spoofed platform headers.
+  const impersonate = process.env.YTDLP_IMPERSONATE;
+  if (impersonate) {
+    args.impersonate = impersonate; // e.g. "chrome"
+  } else {
+    args.addHeader = getPlatformHeaders(platform);
+  }
 
   const subprocess = ytdlp.exec(url, args);
 
