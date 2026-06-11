@@ -36,11 +36,16 @@ function extractYouTubeId(url) {
   return id ? `youtube-${id}` : null;
 }
 
-// Kick example:
-// https://kick.com/nekosunevr/videos/uuid-here
+// Kick VOD: https://kick.com/<channel>/videos/<uuid>
 function extractKickId(url) {
-  const match = url.match(/kick\.com\/[^/]+\/videos\/([a-f0-9-]{10,})/i);
+  const match = url.match(/kick\.com\/[^/]+\/videos\/([a-zA-Z0-9-]{10,})/i);
   return match ? `kick-${match[1]}` : null;
+}
+
+// Kick CLIP: https://kick.com/<channel>/clips/clip_<id>
+function extractKickClip(url) {
+  const m = url.match(/kick\.com\/[^/]+\/clips\/clip_([A-Za-z0-9]+)/i);
+  return m ? `kick-clip-${m[1]}` : null;
 }
 
 // WHITELIST resolver
@@ -49,6 +54,7 @@ function resolveFilenamePrefix(url) {
     extractTwitchId(url) ||
     extractTwitchClip(url) ||
     extractYouTubeId(url) ||
+    extractKickClip(url) ||
     extractKickId(url) ||
     null
   );
