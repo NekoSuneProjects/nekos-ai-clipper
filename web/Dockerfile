@@ -6,9 +6,11 @@
 #   docker buildx build --platform linux/amd64,linux/arm64 -f web/Dockerfile -t you/nekos-clipper-web --push .
 FROM node:20-bookworm-slim
 
-# System tools used by the pipeline (apt pulls the correct arch automatically)
+# System tools used by the pipeline (apt pulls the correct arch automatically).
+# python-is-python3 provides a `python` command (Debian only ships `python3`) —
+# the yt-dlp-exec npm postinstall checks for `python` and fails without it.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      ffmpeg python3 python3-pip ca-certificates \
+      ffmpeg python3 python3-pip python-is-python3 ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 # yt-dlp via pip = pure-Python, works on amd64 AND arm64
