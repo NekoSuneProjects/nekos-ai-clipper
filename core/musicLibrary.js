@@ -162,13 +162,21 @@ async function downloadTrack(track, onProgress = null) {
 
   let finalFile = outFile;
   if (!fs.existsSync(finalFile)) {
-    const mp3s = fs
+    // Never fall back to a *_preview.mp3 (those are 30s clips) — prefer the
+    // track id, else the newest FULL mp3.
+    const cands = fs
       .readdirSync(MUSIC_CACHE_DIR)
-      .filter((f) => f.toLowerCase().endsWith(".mp3"))
-      .map((f) => ({ f, t: fs.statSync(path.join(MUSIC_CACHE_DIR, f)).mtimeMs }))
-      .sort((a, b) => b.t - a.t);
-    if (!mp3s.length) throw new Error("Music download finished but no mp3 found.");
-    finalFile = path.join(MUSIC_CACHE_DIR, mp3s[0].f);
+      .filter((f) => f.toLowerCase().endsWith(".mp3") && !f.toLowerCase().endsWith("_preview.mp3"));
+    const byId = cands.find((f) => f === `${track.id}.mp3`) || cands.find((f) => f.startsWith(track.id + "."));
+    if (byId) {
+      finalFile = path.join(MUSIC_CACHE_DIR, byId);
+    } else {
+      const newest = cands
+        .map((f) => ({ f, t: fs.statSync(path.join(MUSIC_CACHE_DIR, f)).mtimeMs }))
+        .sort((a, b) => b.t - a.t)[0];
+      if (!newest) throw new Error("Music download finished but no mp3 found.");
+      finalFile = path.join(MUSIC_CACHE_DIR, newest.f);
+    }
   }
 
   return { path: finalFile, attribution, creditRequired: track.creditRequired !== false, cached: false, track };

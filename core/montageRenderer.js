@@ -91,7 +91,9 @@ async function renderMontageNormal(videoPath, musicPath, highlights, outPath, on
       .input(toPosix(videoPath))
       .inputOptions(["-f concat", "-safe 0", "-fflags +genpts"]);
 
-    if (hasMusic) cmd.input(toPosix(musicPath));
+    // Loop the music so it covers the FULL montage even if the track is shorter
+    // than the clips; -t caps it and afade handles the in/out.
+    if (hasMusic) cmd.input(toPosix(musicPath)).inputOptions(["-stream_loop", "-1"]);
 
     cmd.complexFilter(filterGraph).videoCodec(enc.codec);
 
