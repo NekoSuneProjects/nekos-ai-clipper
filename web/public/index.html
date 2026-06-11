@@ -20,6 +20,13 @@
     .btn-grad:hover{filter:brightness(1.08)}
     ::-webkit-scrollbar{width:10px}::-webkit-scrollbar-thumb{background:#2a3550;border-radius:8px}
     .bar{transition:width .3s ease}
+    /* Style the native file "Browse" button (Tailwind file: can't reach btn-grad) */
+    input[type=file]::file-selector-button{
+      background-image:linear-gradient(135deg,#7c5cff,#9d6bff);
+      color:#fff;border:0;border-radius:8px;padding:8px 14px;margin-right:12px;
+      font-weight:600;cursor:pointer;font-family:inherit;
+    }
+    input[type=file]::file-selector-button:hover{filter:brightness(1.08)}
   </style>
 </head>
 <body class="app-bg text-gray-200 min-h-screen">
@@ -45,7 +52,7 @@
       <div class="text-center text-xs text-gray-500">— or —</div>
       <div>
         <label class="text-sm text-gray-400">Upload a recording</label>
-        <input id="file" type="file" accept="video/*" class="w-full mt-1 text-sm text-gray-300 file:mr-3 file:px-3 file:py-2 file:rounded-lg file:border-0 file:btn-grad file:text-white" />
+        <input id="file" type="file" accept="video/*" class="w-full mt-1 text-sm text-gray-300" />
       </div>
 
       <div class="grid grid-cols-2 gap-3">
