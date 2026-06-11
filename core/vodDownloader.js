@@ -130,6 +130,10 @@ async function downloadVod(url, folder, onProgress = null) {
   const args = {
     output: outputTemplate,
     format: "mp4/bv*+ba/b",
+    // yt-dlp needs ffmpeg to merge bv*+ba and to remux HLS clips (FixupM3u8).
+    // The app bundles ffmpeg in AppData (not on PATH), so point yt-dlp at it —
+    // without this, Kick/HLS clip downloads fail with "exited with code 1".
+    ffmpegLocation: path.dirname(tools.ffmpeg),
     restrictFilenames: false,
     noWarnings: true,
     noCheckCertificates: true,

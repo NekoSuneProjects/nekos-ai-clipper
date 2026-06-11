@@ -30,8 +30,19 @@ function buildConcatFile(highlights, concatPath, videoPath) {
   fs.writeFileSync(concatPath, content, "utf8");
 }
 
+// Does this file have an audio stream? (Video-only recordings don't — referencing
+// [0:a] in the filtergraph then fails with "Error binding filtergraph inputs".)
+function hasAudioStream(videoPath) {
+  return new Promise((resolve) => {
+    ffmpeg.ffprobe(videoPath, (err, data) => {
+      if (err || !data || !Array.isArray(data.streams)) return resolve(false);
+      resolve(data.streams.some((s) => s.codec_type === "audio"));
+    });
+  });
+}
+
 // ---------- LANDSCAPE MONTAGE ----------
-async function renderMontageNormal(videoPath, musicPath, highlights, outPath, onProgress = () => {}, encoderPref = "auto") {
+async function renderMontageNormal(videoPath, musicPath, highlights, outPath, onProgress = () => {}, encoderPref = "auto", hasGameAudio = true) {
 
   const tools = await prepareTools();
   ffmpeg.setFfmpegPath(tools.ffmpeg);
@@ -40,22 +51,19 @@ async function renderMontageNormal(videoPath, musicPath, highlights, outPath, on
   return new Promise((resolve, reject) => {
     const vfx = getCinemaFxFilters("normal");
 
-    // Montage length = SUM of clip lengths, not the last clip's source
-    // timestamp. (The concat demuxer stitches the trimmed clips back-to-back.)
+    // Montage length = SUM of clip lengths, not the last clip's source timestamp.
     const totalDuration = highlights.reduce(
       (acc, h) => acc + Math.max(0, (h.endMs - h.startMs) / 1000),
       0
     );
     const fadeOutStart = Math.max(0, totalDuration - 2);
-
     const hasMusic = musicPath && musicPath.trim() !== "";
 
+    // Build the audio graph based on what's actually available.
     let filterGraph;
+    let audioMap = "[aout]";
 
-    if (hasMusic) {
-      // ------------------------------
-      // MUSIC + GAME AUDIO
-      // ------------------------------
+    if (hasMusic && hasGameAudio) {
       filterGraph = [
         `[0:v]${vfx}[vfx]`,
         `[1:a]volume=0.5[music_vol]`,
@@ -63,45 +71,45 @@ async function renderMontageNormal(videoPath, musicPath, highlights, outPath, on
         `[music_in]afade=t=out:st=${fadeOutStart}:d=2[music_final]`,
         `[0:a][music_final]amix=inputs=2:weights=1 1:normalize=1[aout]`
       ].join(";");
-    } else {
-      // ------------------------------
-      // **NO MUSIC** → ONLY GAME AUDIO
-      // Keep video FX
-      // ------------------------------
+    } else if (hasMusic) {
+      // Source has no audio → music only.
       filterGraph = [
         `[0:v]${vfx}[vfx]`,
-        `[0:a]anull[aout]`
+        `[1:a]volume=0.8[music_vol]`,
+        `[music_vol]afade=t=in:st=0:d=1[music_in]`,
+        `[music_in]afade=t=out:st=${fadeOutStart}:d=2[aout]`
       ].join(";");
+    } else if (hasGameAudio) {
+      filterGraph = [`[0:v]${vfx}[vfx]`, `[0:a]anull[aout]`].join(";");
+    } else {
+      // No audio at all → video only.
+      filterGraph = `[0:v]${vfx}[vfx]`;
+      audioMap = null;
     }
 
     const cmd = ffmpeg()
       .input(toPosix(videoPath))
-      .inputOptions([
-        "-f concat",
-        "-safe 0",
-        "-fflags +genpts"
-      ]);
+      .inputOptions(["-f concat", "-safe 0", "-fflags +genpts"]);
 
-    // Only add the music input if it exists
-    if (hasMusic) {
-      cmd.input(toPosix(musicPath));
+    if (hasMusic) cmd.input(toPosix(musicPath));
+
+    cmd.complexFilter(filterGraph).videoCodec(enc.codec);
+
+    const outOpts = ["-map", "[vfx]"];
+    if (audioMap) {
+      cmd.audioCodec("aac");
+      outOpts.push("-map", audioMap);
     }
+    outOpts.push(
+      "-t", String(totalDuration),
+      "-pix_fmt", "yuv420p",
+      "-video_track_timescale", "90000",
+      "-movflags", "+faststart",
+      ...encoderArgs(enc.codec, "high"),
+      "-y"
+    );
 
-    cmd
-      .complexFilter(filterGraph)
-      .videoCodec(enc.codec)
-      .audioCodec("aac")
-      .outputOptions([
-        "-map", "[vfx]",
-        "-map", "[aout]",
-        "-t", String(totalDuration),
-        "-shortest",
-        "-pix_fmt", "yuv420p",
-        "-video_track_timescale", "90000",
-        "-movflags", "+faststart",
-        ...encoderArgs(enc.codec, "high"),
-        "-y"
-      ])
+    cmd.outputOptions(outOpts)
       .save(toPosix(outPath))
       .on("progress", (p) => {
         if (totalDuration > 0) {
@@ -168,6 +176,9 @@ async function renderMontage(videoPath, highlights, musicPath, outputDir, onProg
 
   buildConcatFile(highlights, concatFile, videoPath);
 
+  // Probe the source for audio so the montage doesn't reference a missing [0:a].
+  const gameAudio = await hasAudioStream(videoPath);
+
   const result = {};
 
   // The vertical montage is built FROM the landscape one, so we always render
@@ -177,7 +188,7 @@ async function renderMontage(videoPath, highlights, musicPath, outputDir, onProg
 
   if (needLandscapeFirst) {
     await renderMontageNormal(concatFile, musicPath, highlights, outNormal,
-      (pct) => onProgress({ step: "Montage (landscape)", percent: split ? pct * 0.7 : pct }), encoderPref);
+      (pct) => onProgress({ step: "Montage (landscape)", percent: split ? pct * 0.7 : pct }), encoderPref, gameAudio);
     if (wantNormal) result.normalOut = outNormal;
   }
   if (wantShort) {

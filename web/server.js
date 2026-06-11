@@ -74,17 +74,24 @@ async function processJob(job, onProgress) {
   if (job.renderMode === "montage") {
     onProgress({ step: "rendering_montage", progress: 0 });
     let musicPath = null;
-    if (job.musicSource) {
-      try {
-        const m = await musicLibrary.getAutoTrack(
-          { collectionId: job.musicSource, seed: Date.now() },
-          (p) => onProgress({ step: "downloading_music", progress: Math.floor(p) })
+    const onMusicProg = (p) => onProgress({ step: "downloading_music", progress: Math.floor(p) });
+    try {
+      if (job.musicId || job.musicUrl) {
+        // A specific track was picked
+        const m = await musicLibrary.getTrack(
+          { id: job.musicId, url: job.musicUrl, collectionId: job.musicCollection, title: job.musicTitle, artist: job.musicArtist },
+          onMusicProg
         );
         musicPath = m.path;
         job.musicCredit = m.creditRequired === false ? null : m.attribution;
-      } catch (e) {
-        job.musicError = String(e.message || e);
+      } else if (job.musicSource) {
+        // Just a source → random auto-pick
+        const m = await musicLibrary.getAutoTrack({ collectionId: job.musicSource, seed: Date.now() }, onMusicProg);
+        musicPath = m.path;
+        job.musicCredit = m.creditRequired === false ? null : m.attribution;
       }
+    } catch (e) {
+      job.musicError = String(e.message || e);
     }
     const res = await renderMontage(videoPath, highlights, musicPath, jobDir,
       (p) => onProgress(p), format, ENCODER_PREF);
@@ -146,6 +153,33 @@ app.get("/api/music/sources", (_req, res) => {
   try { res.json(musicLibrary.listCollections()); } catch { res.json([]); }
 });
 
+// Expand one source into a song list for the picker
+app.get("/api/music/items", async (req, res) => {
+  try {
+    const id = req.query.collection;
+    const max = Math.min(120, Number(req.query.max) || 60);
+    if (!id || id === "curated") {
+      return res.json({ ok: true, items: musicLibrary.listTracks() });
+    }
+    const col = musicLibrary.listCollections().find((c) => c.id === id);
+    if (!col) return res.json({ ok: false, error: "Unknown source" });
+    const items = await musicLibrary.listCollectionItems(col, max);
+    res.json({ ok: true, items, warning: col.warning, creditRequired: col.creditRequired !== false });
+  } catch (err) {
+    res.json({ ok: false, error: String(err) });
+  }
+});
+
+// Stream a ~30s preview of a track (downloaded + cached server-side)
+app.get("/api/music/preview", async (req, res) => {
+  try {
+    const file = await musicLibrary.previewTrack(req.query.url || req.query.id);
+    res.sendFile(file);
+  } catch (err) {
+    res.status(500).end(String(err));
+  }
+});
+
 // Supporter / donate links (configured via env so you can set your own)
 app.get("/api/support", (_req, res) => {
   const links = [];
@@ -171,6 +205,11 @@ app.post("/api/jobs", upload.single("video"), (req, res) => {
     gameId: body.gameId || null,
     renderMode: body.renderMode === "montage" ? "montage" : "standard",
     musicSource: body.musicSource || null,
+    musicId: body.musicId || null,
+    musicUrl: body.musicUrl || null,
+    musicCollection: body.musicCollection || null,
+    musicTitle: body.musicTitle || null,
+    musicArtist: body.musicArtist || null,
     format: ["normal", "short", "both"].includes(body.format) ? body.format : "both",
   });
   res.json(publicJob(job));
