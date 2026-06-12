@@ -33,15 +33,6 @@
       "creditRequired": true,
       "warning": "Monstercat requires a Monstercat Gold license for monetized videos. Without it, your video may be claimed.",
       "attribution": "Music by Monstercat — https://monstercat.com (license: monstercat.com/licensing)"
-    },
-    {
-      "id": "tiktok",
-      "name": "TikTok",
-      "type": "search",
-      "query": "tiktok viral songs",
-      "creditRequired": true,
-      "warning": "TikTok songs are mainstream COPYRIGHTED music. Using them in monetized YouTube/Twitch content will likely trigger Content-ID claims or strikes.",
-      "attribution": "Contains copyrighted music — use at your own risk."
     }
   ],
   "tracks": [
