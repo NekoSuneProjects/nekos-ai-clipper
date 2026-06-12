@@ -4,10 +4,10 @@
   "fps": 2,
   "crops": {
     "KillMessage": [
-      0.39,
-      0.89,
-      0.46,
-      0.92
+      0.34,
+      0.86,
+      0.72,
+      0.93
     ],
     "KnockMessage": [
       0.845,
@@ -36,10 +36,17 @@
     "streakLookahead": 8
   },
   "detectors": {
-    "kill": [],
+    "kill": [
+      { "event": "kill", "match": ["ELIMINATED"], "score": 82 }
+    ],
     "streak": [],
-    "squadWipe": [],
-    "endGame": []
+    "squadWipe": [
+      { "event": "squadWipe", "match": ["TEAM WIPED", "SQUAD ELIMINATED", "TEAM ELIMINATED"], "score": 80, "crop": "KnockMessage" }
+    ],
+    "endGame": [
+      { "event": "victory", "match": ["VICTORY"], "score": 82 },
+      { "event": "defeat", "match": ["DEFEAT", "YOU DIED"], "score": 82 }
+    ]
   },
   "events": [
     {

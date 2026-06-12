@@ -2,7 +2,12 @@
   "id": "CODMW3",
   "name": "Call of Duty: Modern Warfare III",
   "fps": 2,
-  "crops": {},
+  "ocrThreshold": 190,
+  "crops": {
+    "KillMessage": [0.4, 0.81, 0.58, 0.9],
+    "StreakMessage": [0.68, 0.09, 0.99, 0.22],
+    "GameResult": [0.3, 0.1, 0.7, 0.3]
+  },
   "windows": {
     "killFuture": 2,
     "squadFuture": 2,
@@ -11,10 +16,19 @@
     "streakLookahead": 8
   },
   "detectors": {
-    "kill": [],
-    "streak": [],
+    "kill": [
+      { "event": "kill", "match": ["ST KILL", "ND KILL", "RD KILL", "TH KILL"], "score": 80 }
+    ],
+    "streak": [
+      { "event": "doubleKill", "match": ["DOUBLE KILL"], "score": 80, "crop": "StreakMessage" },
+      { "event": "tripleKill", "match": ["TRIPLE KILL"], "score": 80, "crop": "StreakMessage" },
+      { "event": "killstreak", "match": ["KILLSTREAK"], "score": 80, "crop": "StreakMessage" }
+    ],
     "squadWipe": [],
-    "endGame": []
+    "endGame": [
+      { "event": "victory", "match": ["VICTORY"], "score": 82 },
+      { "event": "defeat", "match": ["DEFEAT"], "score": 82 }
+    ]
   },
   "events": [
     {
