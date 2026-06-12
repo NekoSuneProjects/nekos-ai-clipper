@@ -243,7 +243,7 @@ async function getAutoTrack(opts = {}, onProgress = null) {
       const track = await getRandomFromCollection(collections[0], opts.seed);
       return downloadTrack(track, onProgress);
     }
-    throw new Error("No music sources configured in ncsTracks.json.");
+    throw new Error("No music sources configured in MusicTracks.json.");
   }
 
   let track;
