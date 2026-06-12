@@ -1,0 +1,4 @@
+[submodule "core/gameConfigs"]
+	path = core/gameConfigs
+	url = https://github.com/NekoSuneProjects/nekos-ai-clipper
+	branch = gameconfig
