@@ -2,19 +2,12 @@
   "id": "COD6Z",
   "name": "Call of Duty: Black Ops 6 - Zombies",
   "fps": 2,
+  "ocrThreshold": 185,
+  "killClusterGapMs": 12000,
   "crops": {
-    "Banner": [
-      0.417,
-      0.157,
-      0.583,
-      0.204
-    ],
-    "GameResult": [
-      0.401,
-      0.12,
-      0.651,
-      0.185
-    ]
+    "KillMessage": [0.42, 0.4, 0.85, 0.52],
+    "Banner": [0.417, 0.157, 0.583, 0.204],
+    "GameResult": [0.3, 0.32, 0.7, 0.55]
   },
   "windows": {
     "killFuture": 2,
@@ -24,10 +17,17 @@
     "streakLookahead": 8
   },
   "detectors": {
-    "kill": [],
-    "streak": [],
+    "kill": [
+      { "event": "kill", "match": ["ZOMBIE"], "score": 80 }
+    ],
+    "streak": [
+      { "event": "bossKill", "match": ["AMALGAM", "ABOMINATION"], "score": 82, "crop": "GameResult" }
+    ],
     "squadWipe": [],
-    "endGame": []
+    "endGame": [
+      { "event": "defeat", "match": ["GAME OVER", "BLED OUT"], "score": 82 },
+      { "event": "victory", "match": ["EXFIL", "ESCAPED", "SUCCESSFUL"], "score": 82 }
+    ]
   },
   "events": [
     {
