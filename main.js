@@ -180,6 +180,7 @@ ipcMain.handle("music:listNcs", async () => {
 ipcMain.handle("music:listSources", async () => {
   try {
     const lib = require("./core/musicLibrary");
+    await lib.refreshSources(); // live-pull from the musictracks branch
     return { collections: lib.listCollections(), tracks: lib.listTracks() };
   } catch (err) {
     console.error("Failed to list music sources:", err);
@@ -191,6 +192,7 @@ ipcMain.handle("music:listSources", async () => {
 ipcMain.handle("music:listItems", async (_event, payload) => {
   try {
     const lib = require("./core/musicLibrary");
+    await lib.refreshSources(); // live-pull from the musictracks branch
     const max = (payload && payload.max) || 60;
     if (!payload || !payload.collectionId || payload.collectionId === "curated") {
       return { ok: true, items: lib.listTracks() };
