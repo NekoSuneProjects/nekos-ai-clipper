@@ -8,8 +8,9 @@ permissions:
 on:
   push:
     branches:
-      - RELEASE
-      - TESTING
+      - DEV        # app builder (dev prereleases)
+      - TESTING    # app beta channel
+      - RELEASE    # app release channel
 
 jobs:
   build-and-upload-windows:
@@ -37,7 +38,7 @@ jobs:
           $base = node -p "require('./package.json').version"
           echo "BASE_VERSION=$base" >> $env:GITHUB_ENV
 
-      # ✅ Determine BETA or RELEASE
+      # ✅ Determine channel: DEV (dev) / TESTING (beta) / RELEASE (release)
       - name: Determine Channel + Version
         shell: pwsh
         run: |
@@ -46,6 +47,13 @@ jobs:
             $tag = "BETA-${{ github.run_number }}"
             $version = "$($env:BASE_VERSION)-beta-${{ github.run_number }}"
             $name = "NekosAIClipper BETA V$($env:BASE_VERSION)-${{ github.run_number }}"
+            $prerelease = "true"
+          }
+          elseif ("${{ github.ref_name }}" -eq "DEV") {
+            $channel = "dev"
+            $tag = "DEV-${{ github.run_number }}"
+            $version = "$($env:BASE_VERSION)-dev-${{ github.run_number }}"
+            $name = "NekosAIClipper DEV V$($env:BASE_VERSION)-${{ github.run_number }}"
             $prerelease = "true"
           }
           else {

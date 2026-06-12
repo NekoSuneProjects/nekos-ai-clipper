@@ -5,18 +5,9 @@ name: Build & Publish Web Image (GHCR)
 
 on:
   push:
-    # GitHub runs a push-workflow from the branch that was pushed, so this must
-    # include the branches you actually use (you work on DEV/RELEASE, not main).
-    branches: [ "main", "master", "TESTING", "RELEASE" ]
-    tags: [ "v*" ]
-    # only rebuild when something the image depends on changes
-    paths:
-      - "web/**"
-      - "core/**"
-      - "tools/toolsManager.js"
-      - "package.json"
-      - "package-lock.json"
-      - ".github/workflows/docker-publish.yml"
+    # WEB only: the Docker image is built ONLY when the `web` branch is updated.
+    # App branches (DEV / TESTING / RELEASE) never trigger a Docker build.
+    branches: [ "web" ]
   workflow_dispatch: {}
 
 env:
