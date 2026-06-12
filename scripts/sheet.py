@@ -51,8 +51,13 @@ def build(key, types):
         label = "%s %s" % (hms(e["sec"]), e["event"])
         draw.rectangle([x, y + TILE_H - 18, x + TILE_W, y + TILE_H], fill=(0, 0, 0))
         draw.text((x + 4, y + TILE_H - 17), label, fill=(255, 230, 120), font=font)
+    # keep file sizes small (slow uploads): cap width + optimize PNG
+    MAX_W = 1152
+    if sheet.width > MAX_W:
+        h = round(sheet.height * MAX_W / sheet.width)
+        sheet = sheet.resize((MAX_W, h), Image.LANCZOS)
     name = os.path.join(paths.OUTPUT, "%s_%s_sheet.png" % (key, "+".join(types)))
-    sheet.save(name)
+    sheet.save(name, optimize=True)
     print("wrote %s  (%d events, %dx%d)" % (name, n, sheet.width, sheet.height)); return name
 
 if __name__ == "__main__":

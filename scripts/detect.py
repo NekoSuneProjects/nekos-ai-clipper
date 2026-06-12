@@ -40,6 +40,9 @@ def check_values(detected, match_list, score):
 DEATH_WORDS = ["YOU DIED", "YOU ARE DEAD", "KILLED BY", "ELIMINATED BY",
                "DEFEATED BY", "YOU WERE KILLED", "YOU WERE ELIMINATED",
                "YOU WERE DOWNED", "YOU WERE DESTROYED", "WASTED"]
+# cheap anchors: every death phrase contains one of these. Skip the expensive
+# Levenshtein scan on frames that have none (almost all frames), for big speedup.
+DEATH_ANCHORS = ("BY", "DIED", "DEAD", "WASTED", "WERE", "DOWNED", "DEFEAT")
 COLLAPSE_GAP_MS = {"kill": 4000, "death": 8000, "streak": 6000,
                    "squadWipe": 8000, "endGame": 12000}
 
@@ -81,7 +84,11 @@ def detect(key, cfg_id):
     for fr in frames:
         sec = fr["sec"]
         alltext = " ".join(it["txt"] for it in fr["items"])
-        if check_values(alltext, DEATH_WORDS, 82): emit("death", "death", sec, alltext)
+        au = alltext.upper()
+        # 86 (not 82): stops "ELIMINATED BY" matching the "ELIMINATED:" kill callout.
+        # anchor pre-filter avoids the costly fuzzy scan on non-death frames.
+        if any(a in au for a in DEATH_ANCHORS) and check_values(alltext, DEATH_WORDS, 86):
+            emit("death", "death", sec, alltext)
         for d in det.get("kill", []):
             txt = text_in_crop(fr, crop_for(d, "KillMessage"))
             if check_values(txt, d["match"], d.get("score", 75)): emit("kill", d.get("event", "kill"), sec, txt)
