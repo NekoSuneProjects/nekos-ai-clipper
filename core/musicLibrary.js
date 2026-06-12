@@ -11,32 +11,73 @@
 
 const fs = require("fs");
 const path = require("path");
+const https = require("https");
 const { spawn, execFile } = require("child_process");
 const { create: createYoutubeDl } = require("yt-dlp-exec");
 const { prepareTools, TOOLS_DIR } = require("../tools/toolsManager");
 
-const SOURCES_FILE = path.join(__dirname, "ncsTracks.json");
-// Music (and 30s previews) cache. Desktop sets MUSIC_DIR to the user's Documents
-// folder; otherwise it lives under the app's tools dir.
+// Music sources are LIVE-EDITABLE: fetched at runtime from the `musictracks`
+// branch so the NCS/StreamBeats/etc. lists update WITHOUT rebuilding app/web.
+// Falls back to the downloaded cache, then the bundled MusicTracks.json (offline).
+const SOURCES_FILE = path.join(__dirname, "MusicTracks.json");          // bundled fallback
+const REMOTE_SOURCES_URL = process.env.MUSIC_TRACKS_URL ||
+  "https://raw.githubusercontent.com/NekoSuneProjects/nekos-ai-clipper/musictracks/MusicTracks.json";
 const MUSIC_CACHE_DIR = process.env.MUSIC_DIR || path.join(TOOLS_DIR, "music");
+const SOURCES_CACHE_FILE = path.join(TOOLS_DIR, "MusicTracks.cache.json");
+
+let _sourcesCache = null;
+let _sourcesFetchedAt = 0;
+const SOURCES_TTL = 60 * 1000; // re-fetch from the branch at most once a minute
 
 function ensureDir(dir) {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 }
 
+function parseSources(data) {
+  return {
+    collections: Array.isArray(data.collections)
+      ? data.collections.filter((c) => c && c.id && (c.url || (c.type === "search" && c.query)))
+      : [],
+    tracks: Array.isArray(data.tracks) ? data.tracks.filter((t) => t && t.id && t.url) : []
+  };
+}
+
+function fetchRemoteSources() {
+  return new Promise((resolve) => {
+    const req = https.get(REMOTE_SOURCES_URL, { headers: { "User-Agent": "NekosAIClipper" } }, (res) => {
+      if (res.statusCode !== 200) { res.resume(); return resolve(null); }
+      let data = "";
+      res.on("data", (c) => (data += c));
+      res.on("end", () => { try { resolve(JSON.parse(data)); } catch { resolve(null); } });
+    });
+    req.on("error", () => resolve(null));
+    req.setTimeout(8000, () => { req.destroy(); resolve(null); });
+  });
+}
+
+// Sync — returns the in-memory cache, else the downloaded cache, else the bundled
+// file. Call refreshSources() (async) to pull the latest from the branch.
 function readSources() {
-  try {
-    const data = JSON.parse(fs.readFileSync(SOURCES_FILE, "utf-8"));
-    return {
-      collections: Array.isArray(data.collections)
-        ? data.collections.filter((c) => c && c.id && (c.url || (c.type === "search" && c.query)))
-        : [],
-      tracks: Array.isArray(data.tracks) ? data.tracks.filter((t) => t && t.id && t.url) : []
-    };
-  } catch (err) {
-    console.error("Failed to read music sources (ncsTracks.json):", err);
-    return { collections: [], tracks: [] };
+  if (_sourcesCache) return _sourcesCache;
+  for (const f of [SOURCES_CACHE_FILE, SOURCES_FILE]) {
+    try { _sourcesCache = parseSources(JSON.parse(fs.readFileSync(f, "utf-8"))); return _sourcesCache; } catch {}
   }
+  _sourcesCache = { collections: [], tracks: [] };
+  return _sourcesCache;
+}
+
+// Pull the latest sources from the musictracks branch (cached for SOURCES_TTL).
+async function refreshSources(force = false) {
+  const now = Date.now();
+  if (!force && _sourcesCache && (now - _sourcesFetchedAt) < SOURCES_TTL) return _sourcesCache;
+  const remote = await fetchRemoteSources();
+  if (remote) {
+    _sourcesCache = parseSources(remote);
+    _sourcesFetchedAt = now;
+    try { ensureDir(path.dirname(SOURCES_CACHE_FILE)); fs.writeFileSync(SOURCES_CACHE_FILE, JSON.stringify(remote)); } catch {}
+    return _sourcesCache;
+  }
+  return readSources();
 }
 
 function listTracks() {
@@ -365,6 +406,7 @@ module.exports = {
   getTrack,
   previewTrack,
   prepareMontageMusic,
+  refreshSources,
   attributionFor,
   MUSIC_CACHE_DIR
 };

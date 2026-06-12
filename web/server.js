@@ -147,14 +147,15 @@ app.get("/api/games", (_req, res) => {
   } catch (e) { res.json([]); }
 });
 
-// Music sources
-app.get("/api/music/sources", (_req, res) => {
-  try { res.json(musicLibrary.listCollections()); } catch { res.json([]); }
+// Music sources (refreshed live from the musictracks branch)
+app.get("/api/music/sources", async (_req, res) => {
+  try { await musicLibrary.refreshSources(); res.json(musicLibrary.listCollections()); } catch { res.json([]); }
 });
 
 // Expand one source into a song list for the picker
 app.get("/api/music/items", async (req, res) => {
   try {
+    await musicLibrary.refreshSources();
     const id = req.query.collection;
     const max = Math.min(120, Number(req.query.max) || 60);
     if (!id || id === "curated") {
