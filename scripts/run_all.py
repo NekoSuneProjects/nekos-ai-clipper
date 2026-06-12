@@ -4,7 +4,7 @@ whose game config has detectors. Writes events/<key>.json, output/<key>_*_sheet.
 and a stats CSV at output/stats.csv.
   python run_all.py
 """
-import os, json, csv
+import os, json, csv, shutil
 import paths, detect, sheet
 
 def has_kill_detectors(cfg_id):
@@ -25,8 +25,15 @@ for v in paths.load_videos():
     s = detect.detect(key, cfg)
     # one combined all-events sheet per game (user preference)
     made = sheet.build(key, ["all"])
+    published = ""
+    if made:
+        dest = paths.pos_sheet_path(cfg)
+        os.makedirs(os.path.dirname(dest), exist_ok=True)
+        shutil.copy2(made, dest)
+        published = os.path.relpath(dest, paths.SHEETLEARNING).replace(os.sep, "/")
+        print("published -> SheetLearning/%s" % published)
     rows.append([key, v["title"], cfg, "ok", s["kills"], s["deaths"],
-                 s["victories"], s["defeats"], s["streaks"], os.path.basename(made or "")])
+                 s["victories"], s["defeats"], s["streaks"], published])
 
 with open(os.path.join(paths.OUTPUT, "stats.csv"), "w", newline="", encoding="utf-8") as f:
     w = csv.writer(f)
