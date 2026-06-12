@@ -6,10 +6,12 @@ permissions:
   pull-requests: write
 
 on:
+  # DEV is for developing/saving only — it never builds.
+  # Builds happen on TESTING (beta) and RELEASE (released).
   push:
     branches:
-      - RELEASE
       - TESTING
+      - RELEASE
 
 jobs:
   build-and-upload-windows:
@@ -19,7 +21,8 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0   # full history + tags so we can compute release stats
+          fetch-depth: 0          # full history + tags so we can compute release stats
+          submodules: recursive   # pull core/gameConfigs (gameconfig branch)
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -37,7 +40,7 @@ jobs:
           $base = node -p "require('./package.json').version"
           echo "BASE_VERSION=$base" >> $env:GITHUB_ENV
 
-      # ✅ Determine BETA or RELEASE
+      # ✅ Determine channel: TESTING (beta) / RELEASE (release)
       - name: Determine Channel + Version
         shell: pwsh
         run: |
