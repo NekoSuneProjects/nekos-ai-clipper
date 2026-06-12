@@ -42,10 +42,17 @@
     "streakLookahead": 8
   },
   "detectors": {
-    "kill": [],
-    "streak": [],
+    "kill": [
+      { "event": "objectiveComplete", "match": ["OBJECTIVE COMPLETED", "STRUCTURE DESTROYED"], "score": 82, "crop": "ObjectiveComplete" }
+    ],
+    "streak": [
+      { "event": "areaSecured", "match": ["AREA SECURED"], "score": 82, "crop": "AreaSecured" }
+    ],
     "squadWipe": [],
-    "endGame": []
+    "endGame": [
+      { "event": "victory", "match": ["MISSION COMPLETED", "MISSION COMPLETE"], "score": 82, "crop": "ObjectiveComplete" },
+      { "event": "defeat", "match": ["MISSION FAILED"], "score": 82, "crop": "ObjectiveComplete" }
+    ]
   },
   "events": [
     {

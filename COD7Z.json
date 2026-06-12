@@ -1,0 +1,407 @@
+{
+  "id": "COD7Z",
+  "name": "Call of Duty: Black Ops 7 - Zombies",
+  "fps": 2,
+  "ocrThreshold": 185,
+  "killClusterGapMs": 12000,
+  "crops": {
+    "KillMessage": [
+      0.42,
+      0.4,
+      0.85,
+      0.52
+    ],
+    "Banner": [
+      0.417,
+      0.157,
+      0.583,
+      0.204
+    ],
+    "GameResult": [
+      0.3,
+      0.32,
+      0.7,
+      0.55
+    ]
+  },
+  "windows": {
+    "killFuture": 2,
+    "squadFuture": 2,
+    "endGameFuture": 2,
+    "streakLookbehind": 0,
+    "streakLookahead": 8
+  },
+  "detectors": {
+    "kill": [
+      {
+        "event": "kill",
+        "match": [
+          "ZOMBIE"
+        ],
+        "score": 80
+      }
+    ],
+    "streak": [
+      {
+        "event": "bossKill",
+        "match": [
+          "AMALGAM",
+          "ABOMINATION"
+        ],
+        "score": 82,
+        "crop": "GameResult"
+      }
+    ],
+    "squadWipe": [],
+    "endGame": [
+      {
+        "event": "defeat",
+        "match": [
+          "GAME OVER",
+          "BLED OUT"
+        ],
+        "score": 82
+      },
+      {
+        "event": "victory",
+        "match": [
+          "EXFIL",
+          "ESCAPED",
+          "SUCCESSFUL"
+        ],
+        "score": 82
+      }
+    ]
+  },
+  "events": [
+    {
+      "name": "victory",
+      "displayName": "Victory",
+      "icon": "overall-victory",
+      "default": true,
+      "tooltip": "When you win a game.",
+      "eventScore": 25,
+      "automontage": {
+        "primary": false,
+        "secondary": true,
+        "offsetBefore": 3,
+        "offsetAfter": 3,
+        "effectTypes": []
+      }
+    },
+    {
+      "name": "defeat",
+      "displayName": "Defeat",
+      "icon": "overall-lose",
+      "default": false,
+      "tooltip": "When you lose a game.",
+      "eventScore": 5,
+      "automontage": {
+        "primary": false,
+        "secondary": false,
+        "offsetBefore": 0,
+        "offsetAfter": 0,
+        "effectTypes": []
+      }
+    },
+    {
+      "name": "bossKill",
+      "displayName": "Boss Kill",
+      "icon": "boss-kill",
+      "default": true,
+      "tooltip": "When you kill an Amalgam or an Abomination.",
+      "eventScore": 15,
+      "automontage": {
+        "primary": true,
+        "secondary": false,
+        "offsetBefore": 2,
+        "offsetAfter": 2,
+        "effectTypes": [
+          "greyDistortionArrow",
+          "veryFastThenSlow",
+          "fastThenSlow",
+          "flashScope",
+          "slowFastSlow",
+          "lensShake",
+          "backToColor"
+        ]
+      }
+    },
+    {
+      "name": "streak15",
+      "displayName": "Streak 15",
+      "icon": "streak15",
+      "default": true,
+      "tooltip": "When you kill 15 Zombies in a row without taking damage",
+      "eventScore": 20,
+      "automontage": {
+        "primary": true,
+        "secondary": false,
+        "offsetBefore": 2,
+        "offsetAfter": 2,
+        "effectTypes": [
+          "greyDistortionArrow",
+          "veryFastThenSlow",
+          "fastThenSlow",
+          "flashScope",
+          "slowFastSlow",
+          "lensShake",
+          "backToColor"
+        ]
+      }
+    },
+    {
+      "name": "streak30",
+      "displayName": "Streak 30",
+      "icon": "streak30",
+      "default": true,
+      "tooltip": "When you kill 30 Zombies in a row without taking damage",
+      "eventScore": 25,
+      "automontage": {
+        "primary": true,
+        "secondary": false,
+        "offsetBefore": 2,
+        "offsetAfter": 2,
+        "effectTypes": [
+          "greyDistortionArrow",
+          "veryFastThenSlow",
+          "fastThenSlow",
+          "flashScope",
+          "slowFastSlow",
+          "lensShake",
+          "backToColor"
+        ]
+      }
+    },
+    {
+      "name": "streak50",
+      "displayName": "Streak 50",
+      "icon": "streak50",
+      "default": true,
+      "tooltip": "When you kill 50 Zombies in a row without taking damage",
+      "eventScore": 35,
+      "automontage": {
+        "primary": true,
+        "secondary": false,
+        "offsetBefore": 2,
+        "offsetAfter": 2,
+        "effectTypes": [
+          "greyDistortionArrow",
+          "veryFastThenSlow",
+          "fastThenSlow",
+          "flashScope",
+          "slowFastSlow",
+          "lensShake",
+          "backToColor"
+        ]
+      }
+    },
+    {
+      "name": "streak75",
+      "displayName": "Streak 75",
+      "icon": "streak75",
+      "default": true,
+      "tooltip": "When you kill 75 Zombies in a row without taking damage",
+      "eventScore": 50,
+      "automontage": {
+        "primary": true,
+        "secondary": false,
+        "offsetBefore": 2,
+        "offsetAfter": 2,
+        "effectTypes": [
+          "greyDistortionArrow",
+          "veryFastThenSlow",
+          "fastThenSlow",
+          "flashScope",
+          "slowFastSlow",
+          "lensShake",
+          "backToColor"
+        ]
+      }
+    },
+    {
+      "name": "streak100",
+      "displayName": "Streak 100",
+      "icon": "streak100",
+      "default": true,
+      "tooltip": "When you kill 100 Zombies in a row without taking damage",
+      "eventScore": 100,
+      "automontage": {
+        "primary": true,
+        "secondary": false,
+        "offsetBefore": 2,
+        "offsetAfter": 2,
+        "effectTypes": [
+          "greyDistortionArrow",
+          "veryFastThenSlow",
+          "fastThenSlow",
+          "flashScope",
+          "slowFastSlow",
+          "lensShake",
+          "backToColor"
+        ]
+      }
+    },
+    {
+      "name": "streak200",
+      "displayName": "Streak 200",
+      "icon": "streak200",
+      "default": true,
+      "tooltip": "When you kill 200 Zombies in a row without taking damage",
+      "eventScore": 200,
+      "automontage": {
+        "primary": true,
+        "secondary": false,
+        "offsetBefore": 2,
+        "offsetAfter": 2,
+        "effectTypes": [
+          "greyDistortionArrow",
+          "veryFastThenSlow",
+          "fastThenSlow",
+          "flashScope",
+          "slowFastSlow",
+          "lensShake",
+          "backToColor"
+        ]
+      }
+    },
+    {
+      "name": "mk5",
+      "displayName": "Multi Kill x5",
+      "icon": "mk5",
+      "default": true,
+      "tooltip": "When you kill 5 Zombies rapidly with a Weapon",
+      "eventScore": 200,
+      "automontage": {
+        "primary": true,
+        "secondary": false,
+        "offsetBefore": 2,
+        "offsetAfter": 2,
+        "effectTypes": [
+          "greyDistortionArrow",
+          "veryFastThenSlow",
+          "fastThenSlow",
+          "flashScope",
+          "slowFastSlow",
+          "lensShake",
+          "backToColor"
+        ]
+      }
+    },
+    {
+      "name": "mk10",
+      "displayName": "Multi Kill x10",
+      "icon": "mk10",
+      "default": true,
+      "tooltip": "When you kill 10 Zombies rapidly with a Weapon",
+      "eventScore": 200,
+      "automontage": {
+        "primary": true,
+        "secondary": false,
+        "offsetBefore": 2,
+        "offsetAfter": 2,
+        "effectTypes": [
+          "greyDistortionArrow",
+          "veryFastThenSlow",
+          "fastThenSlow",
+          "flashScope",
+          "slowFastSlow",
+          "lensShake",
+          "backToColor"
+        ]
+      }
+    },
+    {
+      "name": "mk15",
+      "displayName": "Multi Kill x15",
+      "icon": "mk15",
+      "default": true,
+      "tooltip": "When you kill 15 Zombies rapidly with a Weapon",
+      "eventScore": 200,
+      "automontage": {
+        "primary": true,
+        "secondary": false,
+        "offsetBefore": 2,
+        "offsetAfter": 2,
+        "effectTypes": [
+          "greyDistortionArrow",
+          "veryFastThenSlow",
+          "fastThenSlow",
+          "flashScope",
+          "slowFastSlow",
+          "lensShake",
+          "backToColor"
+        ]
+      }
+    },
+    {
+      "name": "mk20",
+      "displayName": "Multi Kill x20",
+      "icon": "mk20",
+      "default": true,
+      "tooltip": "When you kill 20 Zombies rapidly with a Weapon",
+      "eventScore": 200,
+      "automontage": {
+        "primary": true,
+        "secondary": false,
+        "offsetBefore": 2,
+        "offsetAfter": 2,
+        "effectTypes": [
+          "greyDistortionArrow",
+          "veryFastThenSlow",
+          "fastThenSlow",
+          "flashScope",
+          "slowFastSlow",
+          "lensShake",
+          "backToColor"
+        ]
+      }
+    },
+    {
+      "name": "mk25",
+      "displayName": "Multi Kill x25",
+      "icon": "mk25",
+      "default": true,
+      "tooltip": "When you kill 25 Zombies rapidly with a Weapon",
+      "eventScore": 200,
+      "automontage": {
+        "primary": true,
+        "secondary": false,
+        "offsetBefore": 2,
+        "offsetAfter": 2,
+        "effectTypes": [
+          "greyDistortionArrow",
+          "veryFastThenSlow",
+          "fastThenSlow",
+          "flashScope",
+          "slowFastSlow",
+          "lensShake",
+          "backToColor"
+        ]
+      }
+    },
+    {
+      "name": "mk30",
+      "displayName": "Multi Kill x30",
+      "icon": "mk30",
+      "default": true,
+      "tooltip": "When you kill 30 Zombies rapidly with a Weapon",
+      "eventScore": 200,
+      "automontage": {
+        "primary": true,
+        "secondary": false,
+        "offsetBefore": 2,
+        "offsetAfter": 2,
+        "effectTypes": [
+          "greyDistortionArrow",
+          "veryFastThenSlow",
+          "fastThenSlow",
+          "flashScope",
+          "slowFastSlow",
+          "lensShake",
+          "backToColor"
+        ]
+      }
+    }
+  ]
+}
