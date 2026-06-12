@@ -2,7 +2,11 @@
   "id": "PUBG",
   "name": "PUBG: Battlegrounds",
   "fps": 2,
-  "crops": {},
+  "ocrThreshold": 185,
+  "crops": {
+    "KillMessage": [0.38, 0.63, 0.62, 0.73],
+    "GameResult": [0.25, 0.1, 0.75, 0.32]
+  },
   "windows": {
     "killFuture": 2,
     "squadFuture": 2,
@@ -11,10 +15,15 @@
     "streakLookahead": 8
   },
   "detectors": {
-    "kill": [],
+    "kill": [
+      { "event": "kill", "match": ["YOU KILLED"], "score": 80 }
+    ],
     "streak": [],
     "squadWipe": [],
-    "endGame": []
+    "endGame": [
+      { "event": "victory", "match": ["WINNER WINNER", "CHICKEN DINNER"], "score": 80 },
+      { "event": "defeat", "match": ["BETTER LUCK NEXT TIME"], "score": 82 }
+    ]
   },
   "events": [
     {
