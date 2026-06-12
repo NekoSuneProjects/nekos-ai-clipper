@@ -24,6 +24,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          submodules: recursive   # pull core/gameConfigs (gameconfig branch)
 
       # Emulation so we can build linux/arm64 on an amd64 runner
       - name: Set up QEMU
