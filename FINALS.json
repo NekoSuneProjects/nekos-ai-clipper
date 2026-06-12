@@ -2,7 +2,10 @@
   "id": "FINALS",
   "name": "The Finals",
   "fps": 2,
+  "ocrThreshold": 185,
+  "deathCrop": "DeathBanner",
   "crops": {
+    "KillFeed": [0.62, 0.18, 0.99, 0.46],
     "centralMessage": [
       0.26,
       0.644,
@@ -36,10 +39,17 @@
     "streakLookahead": 8
   },
   "detectors": {
-    "kill": [],
+    "kill": [
+      { "event": "elimination", "match": ["ELIMINATED"], "score": 80, "crop": "KillFeed" }
+    ],
     "streak": [],
-    "squadWipe": [],
-    "endGame": []
+    "squadWipe": [
+      { "event": "squadWipe", "match": ["TEAM WIPED", "WIPED OUT", "TEAM ELIMINATED"], "score": 80, "crop": "centralMessage" }
+    ],
+    "endGame": [
+      { "event": "victory", "match": ["VICTORY", "WINNERS", "YOU WON"], "score": 80, "crop": "endGame" },
+      { "event": "defeat", "match": ["DEFEAT"], "score": 82, "crop": "endGame" }
+    ]
   },
   "events": [
     {
