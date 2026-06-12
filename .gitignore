@@ -1,0 +1,27 @@
+# SHEETGEN — ignore large/regenerable artifacts; keep scripts, registry, README, output sheets
+
+# Downloaded videos (huge, deleted after frame extraction anyway)
+downloads/
+*.mp4
+*.webm
+*.part
+*.ytdl
+
+# Extracted frames (huge, regenerable from the videos)
+frames/
+
+# OCR + detection intermediates (regenerable by the pipeline)
+ocr/
+events/
+
+# Logs
+logs/
+*.log
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Keep these (NOT ignored): scripts/, videos.json, README.md, output/
+# The contact-sheet PNGs and stats.csv in output/ are the deliverables.
+!output/

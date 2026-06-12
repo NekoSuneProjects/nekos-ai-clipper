@@ -1,0 +1,19 @@
+[
+  {"key": "arc",             "vid": "NSI-a8szuP0", "cfg": "ARCR",    "title": "ARC Raiders - SOLO Experience"},
+  {"key": "halo",            "vid": "7oETYzF27lQ", "cfg": "HALOINF", "title": "Halo Infinite Multiplayer [4K]"},
+  {"key": "cod_bo6_mp",      "vid": "A8CkYbWss54", "cfg": "CODBO6",  "title": "COD Black Ops 6 Multiplayer"},
+  {"key": "cod_bo6_zombies", "vid": "N1WZXp0kft0", "cfg": "COD6Z",   "title": "COD BO6 Zombies"},
+  {"key": "cod_mw3",         "vid": "UccAQJX1Pmc", "cfg": "CODMW3",  "title": "COD MW3"},
+  {"key": "cod_mw2",         "vid": "2hoS4kkugCs", "cfg": "CODMW2",  "title": "COD MW2"},
+  {"key": "cod_vanguard",    "vid": "JwmqYcDojwg", "cfg": "CODVANG", "title": "COD Vanguard"},
+  {"key": "cod_warzone",     "vid": "e-pmnkI833M", "cfg": "CODWZ4",  "title": "COD Warzone"},
+  {"key": "cod_bo7_mp",      "vid": "Ewda7VEJghg", "cfg": "CODBO7",  "title": "COD Black Ops 7 Multiplayer"},
+  {"key": "cod_bo7_zombies", "vid": "bdiRhr7y30o", "cfg": "COD7Z",   "title": "COD BO7 Zombies"},
+  {"key": "helldivers2",     "vid": "G4rdu_AP9gw", "cfg": "HLDV2",   "title": "Helldivers 2"},
+  {"key": "pubg",            "vid": "e90WhwN2QdQ", "cfg": "PUBG",    "title": "PUBG: Battlegrounds"},
+  {"key": "finals",          "vid": "J9pNWQQc1lo", "cfg": "FINALS",  "title": "The Finals"},
+  {"key": "destiny2",        "vid": "FD8TlKiQ2YM", "cfg": "DES2",    "title": "Destiny 2"},
+  {"key": "mhw",             "vid": "RW4UHY6fAbY", "cfg": "MHW",     "title": "Monster Hunter: World"},
+  {"key": "marvel_rivals",   "vid": "4TF5Xj69qis", "cfg": "MR",      "title": "Marvel Rivals"},
+  {"key": "poe2",            "vid": "nP0aafSPIyY", "cfg": "POE2",    "title": "Path of Exile 2"}
+]
