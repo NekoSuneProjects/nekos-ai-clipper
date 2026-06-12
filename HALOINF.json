@@ -2,7 +2,12 @@
   "id": "HALOINF",
   "name": "Halo Infinite",
   "fps": 2,
-  "crops": {},
+  "ocrThreshold": 180,
+  "crops": {
+    "KillMessage": [0.22, 0.4, 0.52, 0.56],
+    "StreakMessage": [0.25, 0.1, 0.78, 0.32],
+    "GameResult": [0.28, 0.06, 0.72, 0.24]
+  },
   "windows": {
     "killFuture": 2,
     "squadFuture": 2,
@@ -11,10 +16,20 @@
     "streakLookahead": 8
   },
   "detectors": {
-    "kill": [],
-    "streak": [],
+    "kill": [
+      { "event": "kill", "match": ["KILLED"], "score": 80 }
+    ],
+    "streak": [
+      { "event": "doubleKill", "match": ["DOUBLE"], "score": 78 },
+      { "event": "tripleKill", "match": ["TRIPLE"], "score": 78 },
+      { "event": "overkill", "match": ["OVERKILL"], "score": 80 },
+      { "event": "killingSpree", "match": ["KILLING SPREE", "RUNNING RIOT", "RAMPAGE", "KILLJOY", "KILLTACULAR", "KILLIONAIRE"], "score": 82 }
+    ],
     "squadWipe": [],
-    "endGame": []
+    "endGame": [
+      { "event": "victory", "match": ["VICTORY"], "score": 82 },
+      { "event": "defeat", "match": ["DEFEAT"], "score": 82 }
+    ]
   },
   "events": [
     {

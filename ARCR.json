@@ -16,10 +16,10 @@
       0.2
     ],
     "GameResult": [
-      0.4,
-      0.22,
-      0.6,
-      0.36
+      0.2,
+      0.1,
+      0.85,
+      0.52
     ]
   },
   "windows": {
@@ -94,17 +94,22 @@
         "event": "victory",
         "match": [
           "VICTORY",
-          "WIN"
+          "WIN",
+          "RETURNING TO SPERANZA",
+          "RETURN TO SPERANZA",
+          "RETURNED HOME SAFELY"
         ],
-        "score": 70
+        "score": 80
       },
       {
         "event": "defeat",
         "match": [
-          "DEFEAT",
-          "LOSE"
+          "YOU DIED",
+          "YOU WERE DOWNED",
+          "BLED OUT",
+          "ELIMINATED BY"
         ],
-        "score": 70
+        "score": 82
       }
     ]
   },

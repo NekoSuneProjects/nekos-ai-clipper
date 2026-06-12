@@ -2,25 +2,12 @@
   "id": "CODBO6",
   "name": "Call of Duty: Black Ops 6",
   "fps": 2,
+  "ocrThreshold": 190,
   "crops": {
-    "KillMessage": [
-      0.39,
-      0.89,
-      0.46,
-      0.92
-    ],
-    "Banner": [
-      0.417,
-      0.157,
-      0.583,
-      0.204
-    ],
-    "GameResult": [
-      0.3,
-      0.4,
-      0.7,
-      0.6
-    ]
+    "KillMessage": [0.34, 0.86, 0.7, 0.93],
+    "StreakMessage": [0.38, 0.1, 0.78, 0.24],
+    "Banner": [0.417, 0.157, 0.583, 0.204],
+    "GameResult": [0.3, 0.28, 0.7, 0.55]
   },
   "windows": {
     "killFuture": 2,
@@ -30,10 +17,19 @@
     "streakLookahead": 6
   },
   "detectors": {
-    "kill": [],
-    "streak": [],
+    "kill": [
+      { "event": "kill", "match": ["ELIMINATED"], "score": 82 }
+    ],
+    "streak": [
+      { "event": "doubleKill", "match": ["DOUBLE KILL", "DOUBLE"], "score": 80, "crop": "StreakMessage" },
+      { "event": "tripleKill", "match": ["TRIPLE KILL", "TRIPLE"], "score": 80, "crop": "StreakMessage" },
+      { "event": "quadraKill", "match": ["QUAD"], "score": 80, "crop": "StreakMessage" }
+    ],
     "squadWipe": [],
-    "endGame": []
+    "endGame": [
+      { "event": "victory", "match": ["VICTORY"], "score": 82 },
+      { "event": "defeat", "match": ["DEFEAT"], "score": 82 }
+    ]
   },
   "events": [
     {
