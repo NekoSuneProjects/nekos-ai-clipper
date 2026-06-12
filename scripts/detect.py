@@ -69,11 +69,12 @@ def detect(key, cfg_id):
     cfg = json.load(open(paths.cfg_path(cfg_id), encoding="utf-8"))
     crops = cfg.get("crops", {}) or {}; det = cfg.get("detectors", {}) or {}
     frames = load_ocr(key)
+    kill_gap = cfg.get("killClusterGapMs", COLLAPSE_GAP_MS["kill"])
     events = []; last = {}
 
     def emit(etype, event, sec, text):
         ms = sec * 1000; k = (etype, event)
-        gap = COLLAPSE_GAP_MS.get(etype, 4000)
+        gap = kill_gap if etype == "kill" else COLLAPSE_GAP_MS.get(etype, 4000)
         if k in last and ms - last[k] < gap:
             last[k] = ms; return
         last[k] = ms
