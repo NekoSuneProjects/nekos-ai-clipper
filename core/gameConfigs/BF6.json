@@ -2,25 +2,12 @@
   "id": "BF6",
   "name": "Battlefield 6",
   "fps": 4,
+  "ocrThreshold": 185,
+  "_calibration": "BF6 personal kill callouts render CENTER-screen: skull + score, a medal name above (INTERCEPTOR/PROTECTOR/SPEARHEAD/etc.), victim name below, and a KILL / HEADSHOT / DOUBLE KILL / QUAD KILL / VEHICLE DESTROYED tag at the bottom. Crops scan that central band; the left kill-feed is excluded so only YOUR kills count. ocrThreshold binarizes the white callout text. Synced to BF6 gameplay 2026-06.",
   "crops": {
-    "KillMessage": [
-      0.13,
-      0.69,
-      0.395,
-      0.75
-    ],
-    "StreakMessage": [
-      0.21,
-      0.59,
-      0.395,
-      0.65
-    ],
-    "GameResult": [
-      0.38,
-      0.415,
-      0.62,
-      0.53
-    ]
+    "KillMessage": [0.25, 0.46, 0.75, 0.66],
+    "StreakMessage": [0.25, 0.44, 0.75, 0.64],
+    "GameResult": [0.30, 0.10, 0.70, 0.42]
   },
   "windows": {
     "killFuture": 2,
@@ -31,77 +18,23 @@
   },
   "detectors": {
     "kill": [
-      {
-        "event": "kill",
-        "match": [
-          "KILL",
-          "KLL"
-        ],
-        "score": 100
-      },
-      {
-        "event": "headshot",
-        "match": [
-          "HEADSHOT"
-        ],
-        "score": 80
-      },
-      {
-        "event": "vehiculeDestroyed",
-        "match": [
-          "VEHICULE DESTROYED"
-        ],
-        "score": 70
-      }
+      { "event": "kill", "match": ["KILL"], "score": 76 },
+      { "event": "headshot", "match": ["HEADSHOT"], "score": 78 },
+      { "event": "vehiculeDestroyed", "match": ["VEHICLE DESTROYED", "VEHICULE DESTROYED"], "score": 70 }
     ],
     "streak": [
-      {
-        "event": "knifeKill",
-        "match": [
-          "EXECUTIONER"
-        ],
-        "score": 80
-      },
-      {
-        "event": "doubleKill",
-        "match": [
-          "DOUBLE"
-        ],
-        "score": 80
-      },
-      {
-        "event": "tripleKill",
-        "match": [
-          "TRIPLE"
-        ],
-        "score": 80
-      },
-      {
-        "event": "quadraKill",
-        "match": [
-          "QUAD",
-          "OUAD"
-        ],
-        "score": 80
-      },
-      {
-        "event": "reaperMode",
-        "match": [
-          "MARAUDER"
-        ],
-        "score": 80
-      }
+      { "event": "doubleKill", "match": ["DOUBLE KILL", "DOUBLE"], "score": 72 },
+      { "event": "tripleKill", "match": ["TRIPLE KILL", "TRIPLE"], "score": 72 },
+      { "event": "quadraKill", "match": ["QUAD KILL", "QUAD", "OUAD"], "score": 72 },
+      { "event": "knifeKill", "match": ["EXECUTIONER"], "score": 80 },
+      { "event": "reaperMode", "match": ["MARAUDER"], "score": 80 }
     ],
     "squadWipe": [
-      {
-        "event": "squadWipe",
-        "match": [
-          "SQUAD WIPE"
-        ],
-        "score": 80
-      }
+      { "event": "squadWipe", "match": ["SQUAD WIPE"], "score": 78 }
     ],
-    "endGame": []
+    "endGame": [
+      { "event": "victory", "crop": "GameResult", "match": ["VICTORY"], "score": 74 }
+    ]
   },
   "events": [
     {
