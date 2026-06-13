@@ -2,6 +2,7 @@
   "id": "MHW",
   "name": "Monster Hunter: World",
   "fps": 2,
+  "deathCrop": "FaintBanner",
   "crops": {
     "RightMessages": [
       0.776,
@@ -14,7 +15,9 @@
       0.306,
       0.969,
       0.778
-    ]
+    ],
+    "HuntResult": [0.27, 0.53, 0.56, 0.61],
+    "FaintBanner": [0.4, 0.33, 0.6, 0.41]
   },
   "windows": {
     "killFuture": 2,
@@ -24,7 +27,9 @@
     "streakLookahead": 8
   },
   "detectors": {
-    "kill": [],
+    "kill": [
+      { "event": "hunt", "match": ["HUNTED", "CAPTURED", "SLAIN"], "score": 84, "crop": "HuntResult" }
+    ],
     "streak": [],
     "squadWipe": [],
     "endGame": []

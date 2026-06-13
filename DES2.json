@@ -30,10 +30,15 @@
     "streakLookahead": 8
   },
   "detectors": {
-    "kill": [],
+    "kill": [
+      { "event": "defeated", "match": ["DEFEATED"], "score": 86, "crop": "CenterMessages" }
+    ],
     "streak": [],
     "squadWipe": [],
-    "endGame": []
+    "endGame": [
+      { "event": "victory", "match": ["VICTORY"], "score": 82, "crop": "EndGame" },
+      { "event": "defeat", "match": ["DEFEAT"], "score": 82, "crop": "EndGame" }
+    ]
   },
   "events": [
     {

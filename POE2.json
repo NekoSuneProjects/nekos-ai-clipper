@@ -2,12 +2,13 @@
   "id": "POE2",
   "name": "Path of Exile 2",
   "fps": 2,
+  "deathCrop": "Death",
   "crops": {
     "MapComplete": [
-      0.432,
-      0.764,
-      0.573,
-      0.796
+      0.4,
+      0.54,
+      0.62,
+      0.61
     ],
     "Death": [
       0.432,
@@ -24,7 +25,9 @@
     "streakLookahead": 8
   },
   "detectors": {
-    "kill": [],
+    "kill": [
+      { "event": "mapComplete", "match": ["MAP COMPLETED"], "score": 82, "crop": "MapComplete" }
+    ],
     "streak": [],
     "squadWipe": [],
     "endGame": []
