@@ -39,10 +39,11 @@ def check_values(detected, match_list, score):
 
 DEATH_WORDS = ["YOU DIED", "YOU ARE DEAD", "KILLED BY", "ELIMINATED BY",
                "DEFEATED BY", "YOU WERE KILLED", "YOU WERE ELIMINATED",
-               "YOU WERE DOWNED", "YOU WERE DESTROYED", "WASTED"]
+               "YOU WERE DOWNED", "YOU WERE DESTROYED", "WASTED", "YOUVE FAINTED",
+               "YOU HAVE DIED"]
 # cheap anchors: every death phrase contains one of these. Skip the expensive
 # Levenshtein scan on frames that have none (almost all frames), for big speedup.
-DEATH_ANCHORS = ("BY", "DIED", "DEAD", "WASTED", "WERE", "DOWNED", "DEFEAT")
+DEATH_ANCHORS = ("BY", "DIED", "DEAD", "WASTED", "WERE", "DOWNED", "DEFEAT", "FAINT")
 COLLAPSE_GAP_MS = {"kill": 4000, "death": 8000, "streak": 6000,
                    "squadWipe": 8000, "endGame": 12000}
 
@@ -82,14 +83,17 @@ def detect(key, cfg_id):
 
     def crop_for(d, default): return crops.get(d.get("crop", default))
 
+    death_crop_name = cfg.get("deathCrop")  # restrict death scan to one crop (e.g. a death banner)
     for fr in frames:
         sec = fr["sec"]
         alltext = " ".join(it["txt"] for it in fr["items"])
-        au = alltext.upper()
+        # death text: a dedicated crop if configured, else the whole frame
+        dtext = text_in_crop(fr, crops.get(death_crop_name)) if death_crop_name else alltext
+        du = dtext.upper()
         # 86 (not 82): stops "ELIMINATED BY" matching the "ELIMINATED:" kill callout.
         # anchor pre-filter avoids the costly fuzzy scan on non-death frames.
-        if any(a in au for a in DEATH_ANCHORS) and check_values(alltext, DEATH_WORDS, 86):
-            emit("death", "death", sec, alltext)
+        if any(a in du for a in DEATH_ANCHORS) and check_values(dtext, DEATH_WORDS, 86):
+            emit("death", "death", sec, dtext)
         for d in det.get("kill", []):
             txt = text_in_crop(fr, crop_for(d, "KillMessage"))
             if check_values(txt, d["match"], d.get("score", 75)): emit("kill", d.get("event", "kill"), sec, txt)
