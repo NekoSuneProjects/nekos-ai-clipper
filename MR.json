@@ -9,6 +9,7 @@
       1.0,
       0.519
     ],
+    "StreakMessage": [0.28, 0.18, 0.74, 0.86],
     "Spectating": [
       0.0,
       0.03,
@@ -30,10 +31,19 @@
     "streakLookahead": 8
   },
   "detectors": {
-    "kill": [],
-    "streak": [],
+    "kill": [
+      { "event": "kill", "match": ["KO"], "score": 88, "crop": "KillMessage" }
+    ],
+    "streak": [
+      { "event": "doubleKill", "match": ["DOUBLE KO"], "score": 82, "crop": "StreakMessage" },
+      { "event": "tripleKill", "match": ["TRIPLE KO"], "score": 82, "crop": "StreakMessage" },
+      { "event": "koStreak", "match": ["KO STREAK", "PLAYER KO"], "score": 82, "crop": "StreakMessage" }
+    ],
     "squadWipe": [],
-    "endGame": []
+    "endGame": [
+      { "event": "victory", "match": ["VICTORY"], "score": 82, "crop": "GameResult" },
+      { "event": "defeat", "match": ["DEFEAT"], "score": 82, "crop": "GameResult" }
+    ]
   },
   "events": [
     {
