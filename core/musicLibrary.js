@@ -313,11 +313,20 @@ function previewTrackUncached(idOrUrl, id) {
     const proc = spawn(tools.ytdlp, args, { windowsHide: true });
     let stderr = "";
     let realFile = null;
+    let stdoutBuf = "";
     proc.stdout.on("data", (d) => {
-      // Trust yt-dlp's own reported destination over guessing from our -o
-      // template — --download-sections can alter the final filename it writes.
-      const m = d.toString().match(/\[(?:ExtractAudio|Merger|Fixup\w*|download)\]\s+Destination:\s*(.+)/i);
-      if (m) realFile = m[1].trim();
+      // Buffer across chunks and match whole lines only — a "Destination:"
+      // line arriving split across two 'data' events would silently fail to
+      // match (and worse, capture a truncated path) if matched per-chunk.
+      stdoutBuf += d.toString();
+      const lines = stdoutBuf.split(/\r?\n/);
+      stdoutBuf = lines.pop(); // keep the last (possibly incomplete) line buffered
+      for (const line of lines) {
+        // Trust yt-dlp's own reported destination over guessing from our -o
+        // template — --download-sections can alter the final filename it writes.
+        const m = line.match(/\[(?:ExtractAudio|Merger|Fixup\w*|download)\]\s+Destination:\s*(.+)/i);
+        if (m) realFile = m[1].trim();
+      }
     });
     proc.stderr.on("data", (d) => { stderr += d.toString(); });
     proc.on("close", (code) => {

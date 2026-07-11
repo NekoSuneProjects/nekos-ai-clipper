@@ -179,7 +179,15 @@ app.get("/api/music/preview", async (req, res) => {
     // resolved path going missing) is reported async and falls through to
     // Express's default error page instead of our own JSON/text response.
     res.sendFile(file, (err) => {
-      if (err && !res.headersSent) res.status(500).end(String(err));
+      if (err && !res.headersSent) {
+        // err.code carries the underlying fs error (ENOENT/ENOTDIR/etc) that
+        // "NotFoundError: Not Found" alone hides — re-checking existence right
+        // here pins down whether the file vanished between our check above and
+        // send()'s own stat, or something else is going on (e.g. a permissions
+        // issue that send maps to a 404 the same way).
+        console.log(`[preview] sendFile failed for ${file}: code=${err.code} status=${err.status} existsNow=${fs.existsSync(file)}`);
+        res.status(500).end(String(err));
+      }
     });
   } catch (err) {
     res.status(500).end(String(err));
