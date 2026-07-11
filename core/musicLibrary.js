@@ -14,7 +14,7 @@ const path = require("path");
 const https = require("https");
 const { spawn, execFile } = require("child_process");
 const { create: createYoutubeDl } = require("yt-dlp-exec");
-const { prepareTools, TOOLS_DIR } = require("../tools/toolsManager");
+const { prepareTools, TOOLS_DIR, ffmpegDirOf } = require("../tools/toolsManager");
 
 // Music sources are LIVE-EDITABLE: fetched at runtime from the `musictracks`
 // branch so the NCS/StreamBeats/etc. lists update WITHOUT rebuilding app/web.
@@ -169,7 +169,7 @@ async function downloadTrack(track, onProgress = null) {
 
   const tools = await prepareTools();
   const ytdlp = createYoutubeDl(tools.ytdlp);
-  const ffmpegDir = path.dirname(tools.ffmpeg);
+  const ffmpegDir = ffmpegDirOf(tools.ffmpeg);
 
   // Same impersonation the VOD downloader uses (core/vodDownloader.js) — cloud/Docker
   // hosts get bot-blocked by YouTube without it. Don't combine with addHeader; a manual
@@ -282,6 +282,7 @@ function previewTrack(idOrUrl) {
     if (fs.existsSync(outFile) && fs.statSync(outFile).size > 0) return resolve(outFile);
 
     const tools = await prepareTools();
+    const ffmpegDir = ffmpegDirOf(tools.ffmpeg);
     const args = [
       url,
       "--no-playlist", "--no-warnings", "--no-check-certificates",
@@ -289,7 +290,7 @@ function previewTrack(idOrUrl) {
       "--download-sections", "*0:30-1:00",
       "--force-keyframes-at-cuts",
       "-x", "--audio-format", "mp3", "--audio-quality", "5",
-      "--ffmpeg-location", path.dirname(tools.ffmpeg),
+      ...(ffmpegDir ? ["--ffmpeg-location", ffmpegDir] : []),
       "-o", path.join(MUSIC_CACHE_DIR, `${id}_preview.%(ext)s`)
     ];
     const proc = spawn(tools.ytdlp, args, { windowsHide: true });

@@ -204,4 +204,16 @@ async function prepareTools() {
   return tools;
 }
 
-module.exports = { prepareTools, TOOLS_DIR };
+// Directory to hand yt-dlp as --ffmpeg-location. Only meaningful when ffmpegBin
+// is an actual filesystem path (the Windows app downloads a real .exe path). On
+// Linux/Docker, boot-tools.js sets tools.ffmpeg to the bare command "ffmpeg" so
+// it resolves via $PATH — path.dirname("ffmpeg") would wrongly return ".", which
+// makes yt-dlp look for ./ffmpeg in the CWD and fail with "ffmpeg is not
+// installed". Returning undefined here lets yt-dlp fall back to its own $PATH
+// search instead.
+function ffmpegDirOf(ffmpegBin) {
+  if (!ffmpegBin || !/[\\/]/.test(ffmpegBin)) return undefined;
+  return path.dirname(ffmpegBin);
+}
+
+module.exports = { prepareTools, TOOLS_DIR, ffmpegDirOf };
