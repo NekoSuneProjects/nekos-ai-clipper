@@ -89,13 +89,70 @@ function listCollections() {
 }
 
 // What the user must put in their video description for a given source.
+// A collection's `attribution` in MusicTracks.json is a TEMPLATE — it can use
+// {artist}/{title}/{url} placeholders, filled in per-track here, so credit
+// reads like "Artist: Pegboard Nerds / Track: Hero" instead of a generic
+// per-collection blurb. {url} prefers track.listenUrl (the source's own
+// release link, e.g. monster.cat/…, doub.link/…, pulled from the video's
+// description — see extractBioLink below) and falls back to the YouTube url
+// when no such link was found there.
+//
+// Generic fallback ONLY when a collection has no attribution template at all
+// — do not assert a specific source/license here (this used to hardcode
+// "[NCS Release] / ncs.io" for every track, including ones from Monstercat,
+// Ninety9Lives, etc., which is simply false attribution).
 function attributionFor(track) {
-  if (track && track.attribution) return track.attribution;
-  return `Music: ${track.title} — ${track.artist} [NCS Release]\nFree Download / Stream: http://ncs.io/`;
+  if (track && track.attribution) {
+    return track.attribution
+      .replace(/\{artist\}/g, track.artist || "Unknown")
+      .replace(/\{title\}/g, track.title || "")
+      .replace(/\{url\}/g, (track.listenUrl || track.url) || "");
+  }
+  return `Music: ${track.title} — ${track.artist}`;
 }
 
 function cachedPathFor(id) {
   return path.join(MUSIC_CACHE_DIR, `${id}.mp3`);
+}
+
+// Fetch a video's description via yt-dlp without downloading anything — used
+// to pull a source's own canonical release link (Monstercat's monster.cat
+// short links, Ninety9Lives' doub.link/99l.tv links) out of the video bio,
+// since there's no way to derive that URL from YouTube metadata alone.
+function getVideoDescription(ytdlpPath, url) {
+  return new Promise((resolve) => {
+    const proc = spawn(ytdlpPath, ["--skip-download", "--no-warnings", "--print", "%(description)s", url], { windowsHide: true });
+    let out = "";
+    const timer = setTimeout(() => { try { proc.kill(); } catch {} resolve(out); }, 15000);
+    proc.stdout.on("data", (d) => { out += d.toString(); });
+    proc.on("close", () => { clearTimeout(timer); resolve(out); });
+    proc.on("error", () => { clearTimeout(timer); resolve(""); });
+  });
+}
+
+// First URL in `description` whose host matches `pattern` (a RegExp source
+// string, e.g. "monster\\.cat"), trimmed of trailing punctuation picked up by
+// naive URL matching. Returns null if the collection has no pattern set or
+// nothing matched (callers fall back to the YouTube url).
+function extractBioLink(description, pattern) {
+  if (!description || !pattern) return null;
+  const re = new RegExp(pattern, "i");
+  const urls = description.match(/https?:\/\/\S+/gi) || [];
+  const hit = urls.find((u) => re.test(u));
+  return hit ? hit.replace(/[)\].,;:!?'"]+$/, "") : null;
+}
+
+// Resolve track.listenUrl from the collection's bioLinkPattern, if set.
+// Never throws — a failed/slow lookup just means no listenUrl override.
+async function resolveListenUrl(collection, url) {
+  if (!collection || !collection.bioLinkPattern) return null;
+  try {
+    const tools = await prepareTools();
+    const desc = await getVideoDescription(tools.ytdlp, url);
+    return extractBioLink(desc, collection.bioLinkPattern);
+  } catch {
+    return null;
+  }
 }
 
 // Expand a playlist/channel/search to a flat list of {id,title} (metadata only).
@@ -127,7 +184,11 @@ function listCollectionItems(collection, max = 200) {
           const id = line.slice(0, tab).trim();
           const title = line.slice(tab + 1).trim();
           if (!id || id.length < 6) return null;
-          return { id, title };
+          // The channel/playlist IS the artist for these sources (Monstercat,
+          // NCS, Ninety9Lives, StreamBeats all upload under their own name).
+          // Without this, every picked track's artist came out empty, which
+          // is why the picker showed "Unknown" regardless of source.
+          return { id, title, artist: collection.name };
         })
         .filter(Boolean);
       resolve(items);
@@ -143,11 +204,13 @@ async function getRandomFromCollection(collection, seed) {
   const pick = Number.isFinite(seed)
     ? items[Math.abs(Math.floor(seed)) % items.length]
     : items[Math.floor(Math.random() * items.length)];
+  const url = `https://www.youtube.com/watch?v=${pick.id}`;
   return {
     id: pick.id,
     title: pick.title || pick.id,
     artist: collection.name,
-    url: `https://www.youtube.com/watch?v=${pick.id}`,
+    url,
+    listenUrl: await resolveListenUrl(collection, url),
     attribution: collection.attribution,
     creditRequired: collection.creditRequired !== false
   };
@@ -351,20 +414,31 @@ function previewTrackUncached(idOrUrl, id) {
 }
 
 // Download a specific picked track and attach the right credit from its source.
+//
+// opts.attribution / opts.creditRequired / opts.warning let the caller supply
+// the source's credit text directly (the picker UI already has this — it's
+// the same collection data /api/music/sources returned) instead of relying
+// solely on re-finding the collection by id here. That id-based lookup is
+// kept as a fallback for callers that don't have it handy, but preferring the
+// caller's own data avoids the whole class of bug where a later re-lookup
+// mismatches what the user actually picked (which is how a picked Monstercat
+// track was ending up with generic/wrong credit).
 async function getTrack(opts = {}, onProgress = null) {
   const { collections } = readSources();
   const col = opts.collectionId ? collections.find((c) => c.id === opts.collectionId) : null;
   const id = opts.id || (opts.url && opts.url.match(/[?&]v=([\w-]+)/)?.[1]);
   if (!id && !opts.url) throw new Error("getTrack: need an id or url");
+  const url = opts.url || `https://www.youtube.com/watch?v=${id}`;
 
   const track = {
     id: id,
     title: opts.title || id,
     artist: opts.artist || (col ? col.name : "Unknown"),
-    url: opts.url || `https://www.youtube.com/watch?v=${id}`,
-    attribution: col ? col.attribution : undefined,
-    creditRequired: col ? col.creditRequired !== false : true,
-    warning: col ? col.warning : undefined
+    url,
+    listenUrl: await resolveListenUrl(col, url),
+    attribution: opts.attribution !== undefined ? opts.attribution : (col ? col.attribution : undefined),
+    creditRequired: opts.creditRequired !== undefined ? opts.creditRequired !== false : (col ? col.creditRequired !== false : true),
+    warning: opts.warning !== undefined ? opts.warning : (col ? col.warning : undefined)
   };
   const res = await downloadTrack(track, onProgress);
   res.warning = track.warning;

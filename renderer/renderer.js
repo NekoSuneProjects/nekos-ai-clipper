@@ -499,10 +499,13 @@ musicLibraryBtn?.addEventListener("click", openMusicModal);
 musicModalClose?.addEventListener("click", closeMusicModal);
 musicModal?.addEventListener("click", (e) => { if (e.target === musicModal) closeMusicModal(); });
 
+let sourcesById = {}; // collection id -> full source object (attribution/creditRequired/warning)
+
 async function initMusicTabs() {
   let sources = { collections: [], tracks: [] };
   try { sources = await window.api.listMusicSources(); } catch {}
   musicTabsEl.innerHTML = "";
+  sourcesById = Object.fromEntries((sources.collections || []).map((c) => [c.id, c]));
   const tabs = (sources.collections || []).map((c) => ({ id: c.id, name: c.name }));
   if ((sources.tracks || []).length) tabs.push({ id: "curated", name: "NCS Picks" });
 
@@ -585,10 +588,18 @@ async function previewMusicItem(it, btn) {
 async function useMusicItem(it, sourceId, btn) {
   btn.textContent = "…"; btn.disabled = true;
   const creditEl = document.getElementById("musicCredit");
+  // Carry the source's own credit text/warning through directly (from the
+  // same /api/music/sources-equivalent data already fetched for the tabs),
+  // rather than relying on a later re-lookup by id at render time.
+  const src = sourceId !== "curated" ? sourcesById[sourceId] : null;
+  const attribution = src ? src.attribution : undefined;
+  const creditRequired = src ? src.creditRequired : undefined;
+  const warning = src ? src.warning : undefined;
   try {
     const res = await window.api.useMusicTrack({
       id: it.id, url: it.url, title: it.title, artist: it.artist,
-      collectionId: sourceId === "curated" ? null : sourceId
+      collectionId: sourceId === "curated" ? null : sourceId,
+      attribution, creditRequired, warning
     });
     if (!res.ok) { btn.textContent = "✕"; btn.disabled = false; return; }
     chosenMusic = res.path;
@@ -596,7 +607,7 @@ async function useMusicItem(it, sourceId, btn) {
     // same category if it runs longer than this one.
     chosenMusicInfo = {
       collection: sourceId === "curated" ? null : sourceId,
-      track: { id: it.id, url: it.url, title: it.title, artist: it.artist }
+      track: { id: it.id, url: it.url, title: it.title, artist: it.artist, attribution, creditRequired, warning }
     };
     musicInfo.textContent = `🎵 ${it.artist ? it.artist + " — " : ""}${it.title}`;
     if (creditEl) {
