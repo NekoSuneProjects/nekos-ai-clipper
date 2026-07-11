@@ -110,6 +110,7 @@ function listCollectionItems(collection, max = 200) {
       "--flat-playlist",
       "--playlist-end", String(max),
       "--no-warnings",
+      ...(process.env.YTDLP_IMPERSONATE ? ["--impersonate", process.env.YTDLP_IMPERSONATE] : []),
       "--print", "%(id)s\t%(title)s",
       target
     ];
@@ -170,6 +171,11 @@ async function downloadTrack(track, onProgress = null) {
   const ytdlp = createYoutubeDl(tools.ytdlp);
   const ffmpegDir = path.dirname(tools.ffmpeg);
 
+  // Same impersonation the VOD downloader uses (core/vodDownloader.js) — cloud/Docker
+  // hosts get bot-blocked by YouTube without it. Don't combine with addHeader; a manual
+  // UA alongside --impersonate breaks the TLS/UA fingerprint match.
+  const impersonate = process.env.YTDLP_IMPERSONATE;
+
   const subprocess = ytdlp.exec(track.url, {
     output: path.join(MUSIC_CACHE_DIR, `${track.id}.%(ext)s`),
     extractAudio: true,
@@ -180,10 +186,14 @@ async function downloadTrack(track, onProgress = null) {
     noPlaylist: true,
     noWarnings: true,
     noCheckCertificates: true,
-    addHeader: [
-      "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-      "Referer: https://www.youtube.com/"
-    ],
+    ...(impersonate
+      ? { impersonate }
+      : {
+          addHeader: [
+            "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+            "Referer: https://www.youtube.com/"
+          ]
+        }),
     progress: true
   });
 
@@ -271,6 +281,7 @@ function previewTrack(idOrUrl) {
     const args = [
       url,
       "--no-playlist", "--no-warnings", "--no-check-certificates",
+      ...(process.env.YTDLP_IMPERSONATE ? ["--impersonate", process.env.YTDLP_IMPERSONATE] : []),
       "--download-sections", "*0:30-1:00",
       "--force-keyframes-at-cuts",
       "-x", "--audio-format", "mp3", "--audio-quality", "5",
