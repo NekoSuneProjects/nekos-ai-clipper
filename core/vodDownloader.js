@@ -185,7 +185,19 @@ async function downloadVod(url, folder, onProgress = null) {
       subprocess.on("close", (code) => {
         if (code !== 0) return reject(new Error(`yt-dlp exited with code ${code}`));
 
-        if (!destinationFile) {
+        if (destinationFile && !path.isAbsolute(destinationFile)) {
+          destinationFile = path.join(process.cwd(), destinationFile);
+        }
+
+        // The LAST "Destination:" line isn't reliable once a merge is needed
+        // (our format string now prefers bv*+ba, i.e. separate video/audio
+        // downloads) — yt-dlp prints a "Destination:" for EACH component, so
+        // the last one captured is often the temporary audio-only file,
+        // which yt-dlp deletes after merging into the final video. Verify
+        // the captured path actually exists, and fall back to the newest
+        // file in the folder otherwise (which, post-merge, is correctly the
+        // final muxed file since yt-dlp already cleaned up the components).
+        if (!destinationFile || !fs.existsSync(destinationFile)) {
           const files = fs
             .readdirSync(folder)
             .map(f => ({ name: f, time: fs.statSync(path.join(folder, f)).mtimeMs }))
@@ -193,10 +205,6 @@ async function downloadVod(url, folder, onProgress = null) {
 
           if (!files.length) return reject(new Error("Download completed but no file found."));
           destinationFile = path.join(folder, files[0].name);
-        }
-
-        if (!path.isAbsolute(destinationFile)) {
-          destinationFile = path.join(process.cwd(), destinationFile);
         }
 
         resolve(destinationFile);
