@@ -134,7 +134,7 @@ function publicJob(j) {
     mode: j.mode, gameId: j.gameId, renderMode: j.renderMode,
     url: j.url, fileName: j.fileName, error: j.error,
     highlightCount: j.highlightCount, outputs: j.outputs,
-    musicCredit: j.musicCredit, position: queue.position(j.id),
+    musicCredit: j.musicCredit, musicError: j.musicError, position: queue.position(j.id),
     createdAt: j.createdAt,
   };
 }

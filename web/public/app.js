@@ -157,6 +157,7 @@ function jobCard(j) {
     ${j.status === "done" ? `<div class="mt-2 text-xs text-gray-300">${j.highlightCount || 0} highlight(s)</div>` : ""}
     ${outputs ? `<div class="mt-2">${outputs}</div>` : ""}
     ${j.musicCredit ? `<div class="mt-1 text-[11px] text-gray-500 whitespace-pre-line">⚠ ${j.musicCredit}</div>` : ""}
+    ${j.musicError ? `<div class="mt-1 text-[11px] text-yellow-500">⚠ Music not attached: ${j.musicError}</div>` : ""}
   </div>`;
 }
 
