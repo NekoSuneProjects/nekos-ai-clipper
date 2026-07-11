@@ -126,7 +126,17 @@ async function renderMontageNormal(videoPath, musicPath, highlights, outPath, on
           `[1:a]volume=0.5[music_vol]`,
           `[music_vol]afade=t=in:st=0:d=1[music_in]`,
           `[music_in]afade=t=out:st=${fadeOutStart}:d=2[music_final]`,
-          `[0:a][music_final]amix=inputs=2:weights=1 1:normalize=1[aout]`
+          // normalize=0 + dropout_transition=0: amix's defaults (normalize=1,
+          // dropout_transition=2s) dynamically rescale volume and apply a
+          // 2-SECOND fade whenever either input looks like it "dropped out" —
+          // trimming compressed audio at an arbitrary concat-demuxer cut point
+          // isn't always sample-accurate, so the game-audio track likely has
+          // tiny real gaps at every clip boundary. amix was treating each one
+          // as a dropout and fading the whole mix out/in for 2s, which is
+          // exactly what sounded like the music "pausing and resuming every
+          // clip". We already control levels explicitly via volume=/afade=
+          // above, so amix doesn't need its own dynamic behavior here.
+          `[0:a][music_final]amix=inputs=2:weights=1 1:normalize=0:dropout_transition=0[aout]`
         ].join(";")
       : [
           // Stage 1 has no audio stream at all when the source didn't — music only.
