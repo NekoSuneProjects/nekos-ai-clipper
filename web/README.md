@@ -37,15 +37,34 @@ docker build -f web/Dockerfile -t nekos-clipper-web .
 docker run -p 8080:8080 -v $(pwd)/data:/data nekos-clipper-web
 ```
 
-### Multi-arch (AMD64 + ARM64)
+### Multi-arch (AMD64 + ARM64) — Raspberry Pi & plain VPS
 The image is arch-agnostic (node base + apt ffmpeg + pip yt-dlp). Build both:
 ```bash
 docker buildx build --platform linux/amd64,linux/arm64 \
   -f web/Dockerfile -t youruser/nekos-clipper-web --push .
 ```
+Runs as-is on a **Raspberry Pi** (arm64) or any **CPU-only VPS** — `core/encoderDetector.js`
+tests for a GPU encoder at startup, finds none, and uses CPU `libx264`.
 
 The image installs ffmpeg + yt-dlp + python3 and runs the queue server on port 8080.
 Persisted outputs live in the `/data` volume and are **auto-deleted after 24h** (configurable).
+
+### Same image on a GPU VPS (NVIDIA)
+No separate build — the **same** image, run with GPU access, gets `h264_nvenc` for free:
+`core/encoderDetector.js` does a real 1-frame test-encode of each hardware encoder and
+picks the first that actually works, falling back to CPU otherwise. To give it a GPU:
+
+1. Install the **NVIDIA driver** + [**NVIDIA Container
+   Toolkit**](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
+   on the VPS host (the toolkit is what lets `docker run --gpus all` mount the driver's
+   encode libraries into the container — the container itself doesn't need CUDA installed).
+2. Run with `--gpus all`:
+   ```bash
+   docker run --gpus all -p 8080:8080 -v $(pwd)/data:/data ghcr.io/<your-user>/<your-repo>:latest
+   ```
+3. That's it — `ENCODER=auto` (the default) picks NVENC automatically. `ENCODER=cpu` forces
+   `libx264` if you ever need to rule the GPU path out. (`ENCODER=gpu` behaves the same as
+   `auto` today — both silently fall back to CPU if no GPU encoder passes the test-encode.)
 
 ### Auto-build in CI (GitHub Container Registry)
 `.github/workflows/docker-publish.yml` builds the multi-arch image on every push to
@@ -63,7 +82,7 @@ GHCR package public (or `docker login ghcr.io` to pull a private one).
 | `DATA_DIR` | `web/data` | where jobs/uploads/outputs are stored |
 | `MAX_UPLOAD_MB` | 4096 | max upload size |
 | `MAX_CLIPS` | 12 | max clips rendered in "standard" mode |
-| `USE_NVENC` | (off) | set `1` if the host has an NVIDIA GPU + nvenc ffmpeg |
+| `ENCODER` | `auto` | `auto` / `gpu` / `cpu` — see the GPU VPS section above |
 | `RETENTION_HOURS` | 24 | auto-delete job files older than this (cloud space saving) |
 | `SUPPORT_KOFI` / `SUPPORT_PATREON` / `SUPPORT_PAYPAL` / `SUPPORT_GITHUB` | (off) | donate button URLs shown in the UI |
 | `FFMPEG_PATH` / `FFPROBE_PATH` / `YTDLP_PATH` / `PYTHON_PATH` | system names | override tool locations |

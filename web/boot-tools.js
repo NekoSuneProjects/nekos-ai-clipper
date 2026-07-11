@@ -13,7 +13,5 @@ global.TOOLS = {
   python: process.env.PYTHON_PATH || "python3",
 };
 global.TOOLS_READY = true;
-// Most cloud boxes have no NVIDIA GPU; default to CPU x264 unless told otherwise.
-global.USE_NVENC = String(process.env.USE_NVENC || "") === "1";
 
 module.exports = global.TOOLS;

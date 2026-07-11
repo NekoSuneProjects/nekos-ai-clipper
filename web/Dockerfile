@@ -1,6 +1,12 @@
 # Cloud image for the Nekos AI Clipper web version (Linux).
 # Bundles ffmpeg + yt-dlp + python3 so core/* finds them on PATH.
 #
+# ONE image for every target — Raspberry Pi (arm64, CPU), a plain VPS (amd64, CPU),
+# or a GPU VPS (amd64 + NVIDIA): core/encoderDetector.js does a real test-encode at
+# runtime and picks NVENC/AMF/QSV if one actually works, else falls back to CPU
+# libx264. No separate build needed for the GPU case — see web/README.md for the
+# `--gpus all` / nvidia-container-toolkit setup on a GPU VPS.
+#
 # MULTI-ARCH (linux/amd64 + linux/arm64): the node base image, apt ffmpeg, and
 # the pip yt-dlp install are all arch-agnostic. Build both with:
 #   docker buildx build --platform linux/amd64,linux/arm64 -f web/Dockerfile -t you/nekos-clipper-web --push .
@@ -35,7 +41,16 @@ ENV PORT=8080 \
     FFPROBE_PATH=ffprobe \
     YTDLP_PATH=yt-dlp \
     PYTHON_PATH=python3 \
-    YTDLP_IMPERSONATE=chrome
+    YTDLP_IMPERSONATE=chrome \
+    ENCODER=auto
+
+# Harmless on Pi/CPU-only hosts. On a GPU VPS running with `docker run --gpus all`
+# (nvidia-container-toolkit installed on the host), these tell the toolkit which
+# driver capabilities to mount into the container so ffmpeg's h264_nvenc can find
+# libnvidia-encode/libcuda at runtime. See web/README.md.
+ENV NVIDIA_VISIBLE_DEVICES=all \
+    NVIDIA_DRIVER_CAPABILITIES=compute,video,utility
+
 VOLUME ["/data"]
 EXPOSE 8080
 
