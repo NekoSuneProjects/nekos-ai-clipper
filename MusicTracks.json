@@ -7,8 +7,8 @@
       "type": "channel",
       "url": "https://www.youtube.com/@NoCopyrightSounds/videos",
       "creditRequired": true,
-      "bioLinkPattern": "ncs\\.io",
-      "attribution": "Music provided by NoCopyrightSounds\n\nArtist: {artist}\nTrack: {title}\n\nListen:\n{url}\n\nFree Download / Stream: http://ncs.io/"
+      "bioLinkPatterns": { "url": "ncs\\.io", "watchUrl": "lnk\\.to" },
+      "attribution": "Song: {title}\nMusic provided by NoCopyrightSounds\nFree Download/Stream: {url}\nWatch: {watchUrl}"
     },
     {
       "id": "streambeats",
