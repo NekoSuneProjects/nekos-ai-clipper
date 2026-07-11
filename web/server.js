@@ -82,7 +82,14 @@ async function processJob(job, onProgress) {
         const m = await musicLibrary.prepareMontageMusic({
           collectionId: job.musicCollection || job.musicSource || null,
           track: (job.musicId || job.musicUrl)
-            ? { id: job.musicId, url: job.musicUrl, title: job.musicTitle, artist: job.musicArtist }
+            ? {
+                id: job.musicId, url: job.musicUrl, title: job.musicTitle, artist: job.musicArtist,
+                // Carried from the picker (which already had this from
+                // /api/music/sources) rather than re-deriving it here by id.
+                attribution: job.musicAttribution || undefined,
+                creditRequired: job.musicCreditRequired,
+                warning: job.musicWarning || undefined
+              }
             : null
         }, montageSec, onMusicProg);
         musicPath = m.path;
@@ -219,6 +226,9 @@ app.post("/api/jobs", upload.single("video"), (req, res) => {
     musicCollection: body.musicCollection || null,
     musicTitle: body.musicTitle || null,
     musicArtist: body.musicArtist || null,
+    musicAttribution: body.musicAttribution || null,
+    musicCreditRequired: body.musicCreditRequired === undefined ? undefined : body.musicCreditRequired === "1",
+    musicWarning: body.musicWarning || null,
     format: ["normal", "short", "both"].includes(body.format) ? body.format : "both",
   });
   res.json(publicJob(job));

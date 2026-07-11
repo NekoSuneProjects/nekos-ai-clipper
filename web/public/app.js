@@ -1,6 +1,9 @@
 // web/public/app.js — frontend for the cloud clipper
 const $ = (id) => document.getElementById(id);
 const api = (p, opt) => fetch(p, opt).then((r) => r.json());
+const escapeHtml = (s) => String(s).replace(/[&<>"']/g, (c) => ({
+  "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+}[c]));
 
 const STEP_LABEL = {
   queued: "Queued", downloading: "Downloading VOD", analysing: "Analysing",
@@ -62,8 +65,11 @@ function closeMusicModal() {
   try { $("musicAudio").pause(); } catch {}
 }
 
+let sourcesById = {}; // collection id -> full source object (attribution/creditRequired/warning)
+
 async function buildMusicTabs() {
   const sources = await api("/api/music/sources").catch(() => []);
+  sourcesById = Object.fromEntries((sources || []).map((c) => [c.id, c]));
   const tabs = (sources || []).map((c) => ({ id: c.id, name: c.name }));
   tabs.push({ id: "curated", name: "NCS Picks" });
   $("musicTabs").innerHTML = "";
@@ -120,7 +126,17 @@ function renderMusicItems(items, sourceId) {
     use.className = "px-2 py-1 text-xs rounded btn-grad shrink-0";
     use.textContent = "Use";
     use.onclick = () => {
-      chosenMusic = { id: it.id, url: it.url || "", collection: sourceId === "curated" ? "" : sourceId, title: it.title, artist: it.artist || "" };
+      const src = sourceId !== "curated" ? sourcesById[sourceId] : null;
+      chosenMusic = {
+        id: it.id, url: it.url || "", collection: sourceId === "curated" ? "" : sourceId,
+        title: it.title, artist: it.artist || "",
+        // Carry the source's own credit text/warning through directly, rather
+        // than relying on the server re-finding this same collection by id
+        // later at render time.
+        attribution: src ? src.attribution : undefined,
+        creditRequired: src ? src.creditRequired : undefined,
+        warning: src ? src.warning : undefined
+      };
       updateChosenMusic();
       closeMusicModal();
     };
@@ -156,7 +172,14 @@ function jobCard(j) {
     ${j.error ? `<div class="mt-2 text-xs text-red-400">${j.error}</div>` : ""}
     ${j.status === "done" ? `<div class="mt-2 text-xs text-gray-300">${j.highlightCount || 0} highlight(s)</div>` : ""}
     ${outputs ? `<div class="mt-2">${outputs}</div>` : ""}
-    ${j.musicCredit ? `<div class="mt-1 text-[11px] text-gray-500 whitespace-pre-line">⚠ ${j.musicCredit}</div>` : ""}
+    ${j.musicCredit ? `
+    <div class="mt-2">
+      <div class="flex items-center justify-between mb-1">
+        <span class="text-[11px] text-gray-500">⚠ Music credit — paste into your video description</span>
+        <button class="copy-credit-btn text-[11px] px-2 py-0.5 rounded bg-card2 border border-white/10 hover:bg-white/5 shrink-0" data-credit="${escapeHtml(j.musicCredit)}">📋 Copy</button>
+      </div>
+      <pre class="text-[11px] text-gray-400 bg-bg2 border border-white/10 rounded-lg p-2 whitespace-pre-wrap break-words overflow-x-auto"><code>${escapeHtml(j.musicCredit)}</code></pre>
+    </div>` : ""}
     ${j.musicError ? `<div class="mt-1 text-[11px] text-yellow-500">⚠ Music not attached: ${j.musicError}</div>` : ""}
   </div>`;
 }
@@ -203,6 +226,9 @@ $("submit").addEventListener("click", async () => {
       fd.append("musicCollection", chosenMusic.collection || "");
       fd.append("musicTitle", chosenMusic.title || "");
       fd.append("musicArtist", chosenMusic.artist || "");
+      if (chosenMusic.attribution) fd.append("musicAttribution", chosenMusic.attribution);
+      if (chosenMusic.creditRequired !== undefined) fd.append("musicCreditRequired", chosenMusic.creditRequired ? "1" : "0");
+      if (chosenMusic.warning) fd.append("musicWarning", chosenMusic.warning);
     }
     const res = await fetch("/api/jobs", { method: "POST", body: fd }).then((r) => r.json());
     if (res.error) { $("submitMsg").textContent = "Error: " + res.error; }
@@ -220,6 +246,22 @@ $("submit").addEventListener("click", async () => {
 });
 
 $("refresh").addEventListener("click", refresh);
+
+// Event delegation: job cards get replaced wholesale (innerHTML/outerHTML) on
+// every refresh/SSE update, so a listener bound directly to a copy button
+// would stop working after the next re-render. #jobs itself is never
+// replaced, only its children, so binding here survives that.
+$("jobs").addEventListener("click", (e) => {
+  const btn = e.target.closest(".copy-credit-btn");
+  if (!btn) return;
+  const text = btn.dataset.credit;
+  const old = btn.textContent;
+  navigator.clipboard.writeText(text)
+    .then(() => { btn.textContent = "✓ Copied"; })
+    .catch(() => { btn.textContent = "✕ Failed"; })
+    .finally(() => setTimeout(() => { btn.textContent = old; }, 1500));
+});
+
 loadOptions();
 refresh();
 setInterval(refresh, 15000);
