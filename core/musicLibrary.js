@@ -201,11 +201,15 @@ async function downloadTrack(track, onProgress = null) {
     const m = chunk.toString().match(/\[download\]\s+(\d+\.\d+)%/i);
     if (m && onProgress) onProgress(parseFloat(m[1]));
   });
-  subprocess.stderr.on("data", (d) => console.log("[yt-dlp music]", d.toString()));
+  let stderr = "";
+  subprocess.stderr.on("data", (d) => { stderr += d.toString(); console.log("[yt-dlp music]", d.toString()); });
 
   await new Promise((resolve, reject) => {
     subprocess.on("close", (code) => {
-      if (code !== 0) return reject(new Error(`yt-dlp (music) exited with code ${code}`));
+      if (code !== 0) {
+        const reason = stderr.trim().split(/\r?\n/).pop() || "no output";
+        return reject(new Error(`yt-dlp (music) exited with code ${code}: ${reason}`));
+      }
       resolve();
     });
     subprocess.on("error", reject);
@@ -289,13 +293,16 @@ function previewTrack(idOrUrl) {
       "-o", path.join(MUSIC_CACHE_DIR, `${id}_preview.%(ext)s`)
     ];
     const proc = spawn(tools.ytdlp, args, { windowsHide: true });
-    proc.stderr.on("data", () => {});
+    let stderr = "";
+    proc.stderr.on("data", (d) => { stderr += d.toString(); });
     proc.on("close", (code) => {
       if (fs.existsSync(outFile)) return resolve(outFile);
       // yt-dlp may have named it differently; grab newest *_preview.mp3
       const f = fs.readdirSync(MUSIC_CACHE_DIR).filter((x) => x.endsWith("_preview.mp3"));
       if (f.length) return resolve(path.join(MUSIC_CACHE_DIR, f.sort().pop()));
-      reject(new Error("Preview download failed (code " + code + ")"));
+      const reason = stderr.trim().split(/\r?\n/).pop() || "no output";
+      console.log("[yt-dlp preview]", stderr.trim());
+      reject(new Error(`Preview download failed (code ${code}): ${reason}`));
     });
     proc.on("error", reject);
   });
