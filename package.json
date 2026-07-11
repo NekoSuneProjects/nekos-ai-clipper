@@ -61,7 +61,7 @@
     "yt-dlp-exec": "^1.0.2"
   },
   "devDependencies": {
-    "electron": "^32.0.0",
+    "electron": "^43.1.0",
     "electron-builder": "^25.1.8"
   }
 }
