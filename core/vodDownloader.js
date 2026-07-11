@@ -1,7 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const { create: createYoutubeDl } = require("yt-dlp-exec");
-const { prepareTools } = require("../tools/toolsManager");
+const { prepareTools, ffmpegDirOf } = require("../tools/toolsManager");
 
 function ensureDir(dir) {
   if (!fs.existsSync(dir)) {
@@ -119,9 +119,12 @@ async function downloadVod(url, folder, onProgress = null) {
     output: outputTemplate,
     format: "mp4/bv*+ba/b",
     // yt-dlp needs ffmpeg to merge bv*+ba and to remux HLS clips (FixupM3u8).
-    // The app bundles ffmpeg in AppData (not on PATH), so point yt-dlp at it —
-    // without this, Kick/HLS clip downloads fail with "exited with code 1".
-    ffmpegLocation: path.dirname(tools.ffmpeg),
+    // The desktop app bundles ffmpeg in AppData (not on PATH), so point yt-dlp at
+    // it there — without this, Kick/HLS clip downloads fail with "exited with
+    // code 1". On Linux/Docker, tools.ffmpeg is just "ffmpeg" (resolved via
+    // $PATH), so ffmpegDirOf() returns undefined and yt-dlp finds it itself —
+    // path.dirname("ffmpeg") would wrongly resolve to ".".
+    ffmpegLocation: ffmpegDirOf(tools.ffmpeg),
     restrictFilenames: false,
     noWarnings: true,
     noCheckCertificates: true,
