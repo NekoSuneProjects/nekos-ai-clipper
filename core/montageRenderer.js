@@ -42,60 +42,48 @@ function hasAudioStream(videoPath) {
 }
 
 // ---------- LANDSCAPE MONTAGE ----------
+//
+// Two ffmpeg passes when there's music, not one. The concat demuxer stitches
+// segments from wildly different timestamps in the SAME source file — each
+// segment's audio carries its original source PTS, not a continuous timeline.
+// Mixing a continuous, looped music track (amix) against that discontinuous
+// game-audio track in a single pass makes amix's sync logic hiccup at every
+// clip cut, which is audible as the music appearing to skip/jump in lockstep
+// with each clip boundary. Rendering the concat+FX pass first (producing a
+// normal, continuously-timestamped file) and overlaying music in a SEPARATE
+// second pass against that clean file avoids the discontinuity entirely.
 async function renderMontageNormal(videoPath, musicPath, highlights, outPath, onProgress = () => {}, encoderPref = "auto", hasGameAudio = true) {
 
   const tools = await prepareTools();
   ffmpeg.setFfmpegPath(tools.ffmpeg);
   const enc = await resolveCodec(tools.ffmpeg, encoderPref);
 
-  return new Promise((resolve, reject) => {
+  // Montage length = SUM of clip lengths, not the last clip's source timestamp.
+  const totalDuration = highlights.reduce(
+    (acc, h) => acc + Math.max(0, (h.endMs - h.startMs) / 1000),
+    0
+  );
+  const hasMusic = musicPath && musicPath.trim() !== "";
+  const stage1Out = hasMusic ? outPath.replace(/\.mp4$/i, "_stage1.mp4") : outPath;
+
+  // ---- STAGE 1: concat the highlight segments + cinema FX, no music yet ----
+  await new Promise((resolve, reject) => {
     const vfx = getCinemaFxFilters("normal");
 
-    // Montage length = SUM of clip lengths, not the last clip's source timestamp.
-    const totalDuration = highlights.reduce(
-      (acc, h) => acc + Math.max(0, (h.endMs - h.startMs) / 1000),
-      0
-    );
-    const fadeOutStart = Math.max(0, totalDuration - 2);
-    const hasMusic = musicPath && musicPath.trim() !== "";
-
-    // Build the audio graph based on what's actually available.
     let filterGraph;
     let audioMap = "[aout]";
-
-    if (hasMusic && hasGameAudio) {
-      filterGraph = [
-        `[0:v]${vfx}[vfx]`,
-        `[1:a]volume=0.5[music_vol]`,
-        `[music_vol]afade=t=in:st=0:d=1[music_in]`,
-        `[music_in]afade=t=out:st=${fadeOutStart}:d=2[music_final]`,
-        `[0:a][music_final]amix=inputs=2:weights=1 1:normalize=1[aout]`
-      ].join(";");
-    } else if (hasMusic) {
-      // Source has no audio → music only.
-      filterGraph = [
-        `[0:v]${vfx}[vfx]`,
-        `[1:a]volume=0.8[music_vol]`,
-        `[music_vol]afade=t=in:st=0:d=1[music_in]`,
-        `[music_in]afade=t=out:st=${fadeOutStart}:d=2[aout]`
-      ].join(";");
-    } else if (hasGameAudio) {
+    if (hasGameAudio) {
       filterGraph = [`[0:v]${vfx}[vfx]`, `[0:a]anull[aout]`].join(";");
     } else {
-      // No audio at all → video only.
       filterGraph = `[0:v]${vfx}[vfx]`;
       audioMap = null;
     }
 
     const cmd = ffmpeg()
       .input(toPosix(videoPath))
-      .inputOptions(["-f concat", "-safe 0", "-fflags +genpts"]);
-
-    // Loop the music so it covers the FULL montage even if the track is shorter
-    // than the clips; -t caps it and afade handles the in/out.
-    if (hasMusic) cmd.input(toPosix(musicPath)).inputOptions(["-stream_loop", "-1"]);
-
-    cmd.complexFilter(filterGraph).videoCodec(enc.codec);
+      .inputOptions(["-f concat", "-safe 0", "-fflags +genpts"])
+      .complexFilter(filterGraph)
+      .videoCodec(enc.codec);
 
     const outOpts = ["-map", "[vfx]"];
     if (audioMap) {
@@ -112,16 +100,67 @@ async function renderMontageNormal(videoPath, musicPath, highlights, outPath, on
     );
 
     cmd.outputOptions(outOpts)
-      .save(toPosix(outPath))
+      .save(toPosix(stage1Out))
       .on("progress", (p) => {
         if (totalDuration > 0) {
-          const pct = Math.min(99, (timemarkToSec(p.timemark) / totalDuration) * 100);
+          const pct = Math.min(99, (timemarkToSec(p.timemark) / totalDuration) * (hasMusic ? 70 : 100));
           onProgress(pct);
         }
       })
-      .on("end", () => { onProgress(100); resolve(outPath); })
+      .on("end", resolve)
       .on("error", reject);
   });
+
+  if (!hasMusic) {
+    onProgress(100);
+    return outPath;
+  }
+
+  // ---- STAGE 2: overlay music on the now-clean, continuously-timestamped
+  // stage 1 output. Video is stream-copied (already fully encoded + FX'd in
+  // stage 1) — only audio is touched here. ----
+  const fadeOutStart = Math.max(0, totalDuration - 2);
+  await new Promise((resolve, reject) => {
+    const filterGraph = hasGameAudio
+      ? [
+          `[1:a]volume=0.5[music_vol]`,
+          `[music_vol]afade=t=in:st=0:d=1[music_in]`,
+          `[music_in]afade=t=out:st=${fadeOutStart}:d=2[music_final]`,
+          `[0:a][music_final]amix=inputs=2:weights=1 1:normalize=1[aout]`
+        ].join(";")
+      : [
+          // Stage 1 has no audio stream at all when the source didn't — music only.
+          `[1:a]volume=0.8[music_vol]`,
+          `[music_vol]afade=t=in:st=0:d=1[music_in]`,
+          `[music_in]afade=t=out:st=${fadeOutStart}:d=2[aout]`
+        ].join(";");
+
+    ffmpeg()
+      .input(toPosix(stage1Out))
+      .input(toPosix(musicPath)).inputOptions(["-stream_loop", "-1"])
+      .complexFilter(filterGraph)
+      .videoCodec("copy")
+      .audioCodec("aac")
+      .outputOptions([
+        "-map", "0:v",
+        "-map", "[aout]",
+        "-t", String(totalDuration),
+        "-movflags", "+faststart",
+        "-y"
+      ])
+      .save(toPosix(outPath))
+      .on("progress", (p) => {
+        if (totalDuration > 0) {
+          onProgress(70 + Math.min(29, (timemarkToSec(p.timemark) / totalDuration) * 29));
+        }
+      })
+      .on("end", resolve)
+      .on("error", reject);
+  });
+
+  try { fs.unlinkSync(stage1Out); } catch {}
+  onProgress(100);
+  return outPath;
 }
 
 // ---------- VERTICAL MONTAGE ----------

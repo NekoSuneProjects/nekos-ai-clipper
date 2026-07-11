@@ -462,14 +462,44 @@ loadSettings();
 // ------------------------------------------------------------
 // MUSIC PICKER
 // ------------------------------------------------------------
+
+// Shows the credit text as a copy-pasteable codeblock, or a plain note when
+// no attribution is required, or nothing at all when there's no credit yet.
+function setMusicCredit(attribution, creditRequired) {
+  const block = document.getElementById("musicCreditBlock");
+  const credit = document.getElementById("musicCredit");
+  const note = document.getElementById("musicCreditNote");
+  if (creditRequired === false) {
+    block?.classList.add("hidden");
+    if (note) { note.textContent = "✓ No attribution required."; note.classList.remove("hidden"); }
+    return;
+  }
+  note?.classList.add("hidden");
+  if (credit) credit.textContent = attribution || "";
+  block?.classList.toggle("hidden", !attribution);
+}
+
+document.getElementById("copyMusicCredit")?.addEventListener("click", async (e) => {
+  const btn = e.currentTarget;
+  const text = document.getElementById("musicCredit")?.textContent || "";
+  const old = btn.textContent;
+  try {
+    await window.api.copyText(text);
+    btn.textContent = "✓ Copied";
+  } catch {
+    btn.textContent = "✕ Failed";
+  } finally {
+    setTimeout(() => { btn.textContent = old; }, 1500);
+  }
+});
+
 musicBtn?.addEventListener("click", async () => {
   const file = await window.api.chooseMusic();
   if (file) {
     chosenMusic = file;
     chosenMusicInfo = null; // own file → no source to chain from
     musicInfo.textContent = "Selected: " + file;
-    const credit = document.getElementById("musicCredit");
-    if (credit) credit.textContent = "";
+    setMusicCredit("");
   }
 });
 
@@ -499,10 +529,13 @@ musicLibraryBtn?.addEventListener("click", openMusicModal);
 musicModalClose?.addEventListener("click", closeMusicModal);
 musicModal?.addEventListener("click", (e) => { if (e.target === musicModal) closeMusicModal(); });
 
+let sourcesById = {}; // collection id -> full source object (attribution/creditRequired/warning)
+
 async function initMusicTabs() {
   let sources = { collections: [], tracks: [] };
   try { sources = await window.api.listMusicSources(); } catch {}
   musicTabsEl.innerHTML = "";
+  sourcesById = Object.fromEntries((sources.collections || []).map((c) => [c.id, c]));
   const tabs = (sources.collections || []).map((c) => ({ id: c.id, name: c.name }));
   if ((sources.tracks || []).length) tabs.push({ id: "curated", name: "NCS Picks" });
 
@@ -584,11 +617,18 @@ async function previewMusicItem(it, btn) {
 
 async function useMusicItem(it, sourceId, btn) {
   btn.textContent = "…"; btn.disabled = true;
-  const creditEl = document.getElementById("musicCredit");
+  // Carry the source's own credit text/warning through directly (from the
+  // same /api/music/sources-equivalent data already fetched for the tabs),
+  // rather than relying on a later re-lookup by id at render time.
+  const src = sourceId !== "curated" ? sourcesById[sourceId] : null;
+  const attribution = src ? src.attribution : undefined;
+  const creditRequired = src ? src.creditRequired : undefined;
+  const warning = src ? src.warning : undefined;
   try {
     const res = await window.api.useMusicTrack({
       id: it.id, url: it.url, title: it.title, artist: it.artist,
-      collectionId: sourceId === "curated" ? null : sourceId
+      collectionId: sourceId === "curated" ? null : sourceId,
+      attribution, creditRequired, warning
     });
     if (!res.ok) { btn.textContent = "✕"; btn.disabled = false; return; }
     chosenMusic = res.path;
@@ -596,14 +636,10 @@ async function useMusicItem(it, sourceId, btn) {
     // same category if it runs longer than this one.
     chosenMusicInfo = {
       collection: sourceId === "curated" ? null : sourceId,
-      track: { id: it.id, url: it.url, title: it.title, artist: it.artist }
+      track: { id: it.id, url: it.url, title: it.title, artist: it.artist, attribution, creditRequired, warning }
     };
     musicInfo.textContent = `🎵 ${it.artist ? it.artist + " — " : ""}${it.title}`;
-    if (creditEl) {
-      creditEl.textContent = res.creditRequired === false
-        ? "✓ No attribution required."
-        : "⚠ Credit required:\n" + (res.attribution || "");
-    }
+    setMusicCredit(res.attribution, res.creditRequired);
     closeMusicModal();
   } catch (e) {
     btn.textContent = "✕"; btn.disabled = false;

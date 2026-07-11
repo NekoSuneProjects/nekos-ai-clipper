@@ -53,6 +53,10 @@ git submodule update --init --recursive          # if already cloned
 git submodule update --remote core/gameConfigs    # pull the latest profiles
 ```
 
+## 🌐 About the `curl_cffi` / impersonation code
+
+The app has **no proxy support and does no IP rotation.** The only network-adjacent bit worth calling out is in [`core/vodDownloader.js`](core/vodDownloader.js): on Linux/Docker hosts, `yt-dlp` can optionally use **TLS/browser fingerprint impersonation** (via `curl_cffi`, pretending to be a real Chrome client) to get past Cloudflare's anti-bot check when it blocks Kick/Twitch clip downloads with a 403. It's a workaround for a stale `yt-dlp` extractor signature, not a proxy — it changes what the request *looks like*, not where it's routed from. It's opt-in via an env var (`YTDLP_IMPERSONATE`) and unused on Windows builds.
+
 ## 🔁 Updating this branch from DEV
 
 `app` is slim, so **don't `merge DEV`** (it re-adds web files). Pull only app paths:

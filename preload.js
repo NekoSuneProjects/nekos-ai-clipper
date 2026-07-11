@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld("api", {
   onAnalyseProgress: (cb) => ipcRenderer.on("analyse:progress", (_, data) => cb(data)),
   chooseOutputDir: () => ipcRenderer.invoke("dialog:chooseOutputDir"),
   showInFolder: (file) => ipcRenderer.invoke("os:showInFolder", file),
+  copyText: (text) => ipcRenderer.invoke("os:copyText", text),
 
   // 🔥 YOU MUST ADD THIS OR MUSIC WON'T WORK
   chooseMusic: () => ipcRenderer.invoke("dialog:chooseMusic"),

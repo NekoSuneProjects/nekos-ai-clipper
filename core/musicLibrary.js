@@ -14,7 +14,7 @@ const path = require("path");
 const https = require("https");
 const { spawn, execFile } = require("child_process");
 const { create: createYoutubeDl } = require("yt-dlp-exec");
-const { prepareTools, TOOLS_DIR } = require("../tools/toolsManager");
+const { prepareTools, TOOLS_DIR, ffmpegDirOf } = require("../tools/toolsManager");
 
 // Music sources are LIVE-EDITABLE: fetched at runtime from the `musictracks`
 // branch so the NCS/StreamBeats/etc. lists update WITHOUT rebuilding app/web.
@@ -89,13 +89,101 @@ function listCollections() {
 }
 
 // What the user must put in their video description for a given source.
+// A collection's `attribution` in MusicTracks.json is a TEMPLATE — it can use
+// {artist}/{title}/{url} placeholders, filled in per-track here, so credit
+// reads like "Artist: Pegboard Nerds / Track: Hero" instead of a generic
+// per-collection blurb. {url} prefers track.bioLinks.url (the source's own
+// release link, e.g. monster.cat/…, doub.link/…, pulled from the video's
+// description — see extractBioLink below); some sources need MORE than one
+// link (NCS credit wants both a "Free Download/Stream:" ncs.io link AND a
+// separate "Watch:" ncs.lnk.to link) — any other key in track.bioLinks fills
+// the matching {key} placeholder (e.g. {watchUrl}) the same way. Anything
+// left unfilled falls back to the plain YouTube url.
+//
+// Generic fallback ONLY when a collection has no attribution template at all
+// — do not assert a specific source/license here (this used to hardcode
+// "[NCS Release] / ncs.io" for every track, including ones from Monstercat,
+// Ninety9Lives, etc., which is simply false attribution).
 function attributionFor(track) {
-  if (track && track.attribution) return track.attribution;
-  return `Music: ${track.title} — ${track.artist} [NCS Release]\nFree Download / Stream: http://ncs.io/`;
+  if (track && track.attribution) {
+    let text = track.attribution
+      .replace(/\{artist\}/g, track.artist || "Unknown")
+      .replace(/\{title\}/g, track.title || "");
+    const links = { url: track.url, ...(track.bioLinks || {}) };
+    for (const [key, val] of Object.entries(links)) {
+      if (val) text = text.split(`{${key}}`).join(val);
+    }
+    // Any placeholder left over (a link pattern was configured but nothing
+    // matched in the description) gets the plain YouTube url rather than a
+    // literal "{watchUrl}" showing up in the credit text.
+    text = text.replace(/\{\w+\}/g, () => track.url || "");
+    return text;
+  }
+  return `Music: ${track.title} — ${track.artist}`;
 }
 
 function cachedPathFor(id) {
   return path.join(MUSIC_CACHE_DIR, `${id}.mp3`);
+}
+
+// Fetch a video's description via yt-dlp without downloading anything — used
+// to pull a source's own canonical release link (Monstercat's monster.cat
+// short links, Ninety9Lives' doub.link/99l.tv links) out of the video bio,
+// since there's no way to derive that URL from YouTube metadata alone.
+function getVideoDescription(ytdlpPath, url) {
+  return new Promise((resolve) => {
+    const proc = spawn(ytdlpPath, ["--skip-download", "--no-warnings", "--print", "%(description)s", url], { windowsHide: true });
+    let out = "";
+    const timer = setTimeout(() => { try { proc.kill(); } catch {} resolve(out); }, 15000);
+    proc.stdout.on("data", (d) => { out += d.toString(); });
+    proc.on("close", () => { clearTimeout(timer); resolve(out); });
+    proc.on("error", () => { clearTimeout(timer); resolve(""); });
+  });
+}
+
+// First URL in `description` whose host matches `pattern` (a RegExp source
+// string, e.g. "monster\\.cat"), trimmed of trailing punctuation picked up by
+// naive URL matching. Returns null if the collection has no pattern set or
+// nothing matched (callers fall back to the YouTube url).
+function extractBioLink(description, pattern) {
+  if (!description || !pattern) return null;
+  const re = new RegExp(pattern, "i");
+  const urls = description.match(/https?:\/\/\S+/gi) || [];
+  const hit = urls.find((u) => re.test(u));
+  return hit ? hit.replace(/[)\].,;:!?'"]+$/, "") : null;
+}
+
+// A collection can name one bio-link pattern (bioLinkPattern, a plain string
+// — becomes the {url} placeholder) or several named ones (bioLinkPatterns,
+// an object — each key becomes its own {key} placeholder, e.g.
+// { url: "ncs\\.io", watchUrl: "lnk\\.to" }).
+function bioLinkPatternsOf(collection) {
+  if (!collection) return null;
+  if (collection.bioLinkPatterns && typeof collection.bioLinkPatterns === "object") {
+    return collection.bioLinkPatterns;
+  }
+  if (collection.bioLinkPattern) return { url: collection.bioLinkPattern };
+  return null;
+}
+
+// Resolve track.bioLinks ({ url, ...anyOtherNamedLinks }) from the
+// collection's bio-link pattern(s), if any are set. Fetches the description
+// ONCE regardless of how many named patterns there are. Never throws — a
+// failed/slow lookup just means no bioLinks overrides.
+async function resolveBioLinks(collection, url) {
+  const patterns = bioLinkPatternsOf(collection);
+  if (!patterns) return {};
+  try {
+    const tools = await prepareTools();
+    const desc = await getVideoDescription(tools.ytdlp, url);
+    const links = {};
+    for (const [key, pattern] of Object.entries(patterns)) {
+      links[key] = extractBioLink(desc, pattern);
+    }
+    return links;
+  } catch {
+    return {};
+  }
 }
 
 // Expand a playlist/channel/search to a flat list of {id,title} (metadata only).
@@ -110,6 +198,7 @@ function listCollectionItems(collection, max = 200) {
       "--flat-playlist",
       "--playlist-end", String(max),
       "--no-warnings",
+      ...(process.env.YTDLP_IMPERSONATE ? ["--impersonate", process.env.YTDLP_IMPERSONATE] : []),
       "--print", "%(id)s\t%(title)s",
       target
     ];
@@ -126,7 +215,11 @@ function listCollectionItems(collection, max = 200) {
           const id = line.slice(0, tab).trim();
           const title = line.slice(tab + 1).trim();
           if (!id || id.length < 6) return null;
-          return { id, title };
+          // The channel/playlist IS the artist for these sources (Monstercat,
+          // NCS, Ninety9Lives, StreamBeats all upload under their own name).
+          // Without this, every picked track's artist came out empty, which
+          // is why the picker showed "Unknown" regardless of source.
+          return { id, title, artist: collection.name };
         })
         .filter(Boolean);
       resolve(items);
@@ -142,11 +235,13 @@ async function getRandomFromCollection(collection, seed) {
   const pick = Number.isFinite(seed)
     ? items[Math.abs(Math.floor(seed)) % items.length]
     : items[Math.floor(Math.random() * items.length)];
+  const url = `https://www.youtube.com/watch?v=${pick.id}`;
   return {
     id: pick.id,
     title: pick.title || pick.id,
     artist: collection.name,
-    url: `https://www.youtube.com/watch?v=${pick.id}`,
+    url,
+    bioLinks: await resolveBioLinks(collection, url),
     attribution: collection.attribution,
     creditRequired: collection.creditRequired !== false
   };
@@ -168,38 +263,73 @@ async function downloadTrack(track, onProgress = null) {
 
   const tools = await prepareTools();
   const ytdlp = createYoutubeDl(tools.ytdlp);
-  const ffmpegDir = path.dirname(tools.ffmpeg);
+  const ffmpegDir = ffmpegDirOf(tools.ffmpeg);
 
-  const subprocess = ytdlp.exec(track.url, {
-    output: path.join(MUSIC_CACHE_DIR, `${track.id}.%(ext)s`),
-    extractAudio: true,
-    audioFormat: "mp3",
-    audioQuality: 0,
-    format: "bestaudio/best",
-    ffmpegLocation: ffmpegDir,
-    noPlaylist: true,
-    noWarnings: true,
-    noCheckCertificates: true,
-    addHeader: [
-      "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-      "Referer: https://www.youtube.com/"
-    ],
-    progress: true
-  });
+  // Same impersonation the VOD downloader uses (core/vodDownloader.js) — cloud/Docker
+  // hosts get bot-blocked by YouTube without it. Don't combine with addHeader; a manual
+  // UA alongside --impersonate breaks the TLS/UA fingerprint match.
+  const impersonate = process.env.YTDLP_IMPERSONATE;
 
-  subprocess.stdout.on("data", (chunk) => {
-    const m = chunk.toString().match(/\[download\]\s+(\d+\.\d+)%/i);
-    if (m && onProgress) onProgress(parseFloat(m[1]));
-  });
-  subprocess.stderr.on("data", (d) => console.log("[yt-dlp music]", d.toString()));
+  function attempt() {
+    return new Promise((resolve, reject) => {
+      const subprocess = ytdlp.exec(track.url, {
+        output: path.join(MUSIC_CACHE_DIR, `${track.id}.%(ext)s`),
+        extractAudio: true,
+        audioFormat: "mp3",
+        audioQuality: 0,
+        format: "bestaudio/best",
+        ffmpegLocation: ffmpegDir,
+        noPlaylist: true,
+        noWarnings: true,
+        noCheckCertificates: true,
+        ...(impersonate
+          ? { impersonate }
+          : {
+              addHeader: [
+                "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+                "Referer: https://www.youtube.com/"
+              ]
+            }),
+        progress: true
+      });
 
-  await new Promise((resolve, reject) => {
-    subprocess.on("close", (code) => {
-      if (code !== 0) return reject(new Error(`yt-dlp (music) exited with code ${code}`));
-      resolve();
+      subprocess.stdout.on("data", (chunk) => {
+        const m = chunk.toString().match(/\[download\]\s+(\d+\.\d+)%/i);
+        if (m && onProgress) onProgress(parseFloat(m[1]));
+      });
+      let stderr = "";
+      subprocess.stderr.on("data", (d) => { stderr += d.toString(); console.log("[yt-dlp music]", d.toString()); });
+
+      subprocess.on("close", (code) => {
+        if (code !== 0) {
+          const reason = stderr.trim().split(/\r?\n/).pop() || "no output";
+          return reject(new Error(`yt-dlp (music) exited with code ${code}: ${reason}`));
+        }
+        resolve();
+      });
+      subprocess.on("error", reject);
     });
-    subprocess.on("error", reject);
-  });
+  }
+
+  // yt-dlp occasionally fails a "cold" first request with a 403 (YouTube's bot
+  // gating rejecting the request/challenge) and succeeds right after on retry —
+  // same flakiness class documented elsewhere for this pipeline. Retry a few
+  // times before surfacing the failure.
+  let lastErr;
+  for (let i = 1; i <= 3; i++) {
+    try {
+      await attempt();
+      lastErr = null;
+      break;
+    } catch (err) {
+      lastErr = err;
+      if (i < 3) {
+        console.log(`[yt-dlp music] attempt ${i}/3 failed (${err.message}), retrying...`);
+        await new Promise((r) => setTimeout(r, 1500));
+      }
+    }
+  }
+  if (lastErr) throw lastErr;
 
   let finalFile = outFile;
   if (!fs.existsSync(finalFile)) {
@@ -258,53 +388,110 @@ async function getAutoTrack(opts = {}, onProgress = null) {
 }
 
 // Download a ~30s preview snippet of a track for the picker. Cached separately.
+//
+// Concurrent requests for the same id are deduped onto a single in-flight
+// download instead of each spawning their own yt-dlp process against the same
+// output filename — two processes racing on one destination file is how you
+// get one finished + one clobbering it mid-postprocess, which previously
+// showed up as previewTrack() resolving a path that no longer existed by the
+// time res.sendFile() read it.
+const _previewInFlight = new Map(); // id -> Promise<string>
+
 function previewTrack(idOrUrl) {
+  const id = /^https?:/i.test(idOrUrl) ? (idOrUrl.match(/[?&]v=([\w-]+)/)?.[1] || idOrUrl) : idOrUrl;
+  if (_previewInFlight.has(id)) return _previewInFlight.get(id);
+
+  const promise = previewTrackUncached(idOrUrl, id).finally(() => _previewInFlight.delete(id));
+  _previewInFlight.set(id, promise);
+  return promise;
+}
+
+function previewTrackUncached(idOrUrl, id) {
   return new Promise(async (resolve, reject) => {
     ensureDir(MUSIC_CACHE_DIR);
-    const id = /^https?:/i.test(idOrUrl) ? (idOrUrl.match(/[?&]v=([\w-]+)/)?.[1] || idOrUrl) : idOrUrl;
     const url = /^https?:/i.test(idOrUrl) ? idOrUrl : `https://www.youtube.com/watch?v=${idOrUrl}`;
     const outFile = path.join(MUSIC_CACHE_DIR, `${id}_preview.mp3`);
 
     if (fs.existsSync(outFile) && fs.statSync(outFile).size > 0) return resolve(outFile);
 
     const tools = await prepareTools();
+    const ffmpegDir = ffmpegDirOf(tools.ffmpeg);
     const args = [
       url,
       "--no-playlist", "--no-warnings", "--no-check-certificates",
+      ...(process.env.YTDLP_IMPERSONATE ? ["--impersonate", process.env.YTDLP_IMPERSONATE] : []),
       "--download-sections", "*0:30-1:00",
       "--force-keyframes-at-cuts",
       "-x", "--audio-format", "mp3", "--audio-quality", "5",
-      "--ffmpeg-location", path.dirname(tools.ffmpeg),
+      ...(ffmpegDir ? ["--ffmpeg-location", ffmpegDir] : []),
       "-o", path.join(MUSIC_CACHE_DIR, `${id}_preview.%(ext)s`)
     ];
     const proc = spawn(tools.ytdlp, args, { windowsHide: true });
-    proc.stderr.on("data", () => {});
+    let stderr = "";
+    let realFile = null;
+    let stdoutBuf = "";
+    proc.stdout.on("data", (d) => {
+      // Buffer across chunks and match whole lines only — a "Destination:"
+      // line arriving split across two 'data' events would silently fail to
+      // match (and worse, capture a truncated path) if matched per-chunk.
+      stdoutBuf += d.toString();
+      const lines = stdoutBuf.split(/\r?\n/);
+      stdoutBuf = lines.pop(); // keep the last (possibly incomplete) line buffered
+      for (const line of lines) {
+        // Trust yt-dlp's own reported destination over guessing from our -o
+        // template — --download-sections can alter the final filename it writes.
+        const m = line.match(/\[(?:ExtractAudio|Merger|Fixup\w*|download)\]\s+Destination:\s*(.+)/i);
+        if (m) realFile = m[1].trim();
+      }
+    });
+    proc.stderr.on("data", (d) => { stderr += d.toString(); });
     proc.on("close", (code) => {
+      console.log(`[yt-dlp preview] id=${id} code=${code} realFile=${realFile || "(none)"}`);
+      if (realFile && fs.existsSync(realFile)) return resolve(realFile);
       if (fs.existsSync(outFile)) return resolve(outFile);
-      // yt-dlp may have named it differently; grab newest *_preview.mp3
-      const f = fs.readdirSync(MUSIC_CACHE_DIR).filter((x) => x.endsWith("_preview.mp3"));
-      if (f.length) return resolve(path.join(MUSIC_CACHE_DIR, f.sort().pop()));
-      reject(new Error("Preview download failed (code " + code + ")"));
+      // yt-dlp named it differently — grab the newest file for THIS id
+      // specifically. Matching any "*_preview.mp3" would risk resolving a
+      // different track's stale cache file while this one is actually missing.
+      const f = fs.readdirSync(MUSIC_CACHE_DIR)
+        .filter((x) => x.startsWith(`${id}_preview`))
+        .map((x) => ({ x, t: fs.statSync(path.join(MUSIC_CACHE_DIR, x)).mtimeMs }))
+        .sort((a, b) => b.t - a.t);
+      console.log(`[yt-dlp preview] id=${id} fallback candidates:`, f.map((c) => c.x));
+      if (f.length) return resolve(path.join(MUSIC_CACHE_DIR, f[0].x));
+      const reason = stderr.trim().split(/\r?\n/).pop() || "no output";
+      console.log("[yt-dlp preview] stderr:", stderr.trim());
+      reject(new Error(`Preview download failed (code ${code}): ${reason}`));
     });
     proc.on("error", reject);
   });
 }
 
 // Download a specific picked track and attach the right credit from its source.
+//
+// opts.attribution / opts.creditRequired / opts.warning let the caller supply
+// the source's credit text directly (the picker UI already has this — it's
+// the same collection data /api/music/sources returned) instead of relying
+// solely on re-finding the collection by id here. That id-based lookup is
+// kept as a fallback for callers that don't have it handy, but preferring the
+// caller's own data avoids the whole class of bug where a later re-lookup
+// mismatches what the user actually picked (which is how a picked Monstercat
+// track was ending up with generic/wrong credit).
 async function getTrack(opts = {}, onProgress = null) {
   const { collections } = readSources();
   const col = opts.collectionId ? collections.find((c) => c.id === opts.collectionId) : null;
   const id = opts.id || (opts.url && opts.url.match(/[?&]v=([\w-]+)/)?.[1]);
   if (!id && !opts.url) throw new Error("getTrack: need an id or url");
+  const url = opts.url || `https://www.youtube.com/watch?v=${id}`;
 
   const track = {
     id: id,
     title: opts.title || id,
     artist: opts.artist || (col ? col.name : "Unknown"),
-    url: opts.url || `https://www.youtube.com/watch?v=${id}`,
-    attribution: col ? col.attribution : undefined,
-    creditRequired: col ? col.creditRequired !== false : true,
-    warning: col ? col.warning : undefined
+    url,
+    bioLinks: await resolveBioLinks(col, url),
+    attribution: opts.attribution !== undefined ? opts.attribution : (col ? col.attribution : undefined),
+    creditRequired: opts.creditRequired !== undefined ? opts.creditRequired !== false : (col ? col.creditRequired !== false : true),
+    warning: opts.warning !== undefined ? opts.warning : (col ? col.warning : undefined)
   };
   const res = await downloadTrack(track, onProgress);
   res.warning = track.warning;

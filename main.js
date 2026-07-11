@@ -1,5 +1,5 @@
 // main.js
-const { app, BrowserWindow, ipcMain, dialog, shell } = require("electron");
+const { app, BrowserWindow, ipcMain, dialog, shell, clipboard } = require("electron");
 const path = require("path");
 const fs = require("fs");
 const { spawn } = require("child_process");
@@ -580,6 +580,12 @@ ipcMain.handle("os:showInFolder", async (_, filePath) => {
     return true;
   }
   return false;
+});
+
+// Copy text to the OS clipboard (used by the music credit "Copy" button)
+ipcMain.handle("os:copyText", (_event, text) => {
+  clipboard.writeText(String(text || ""));
+  return true;
 });
 
 // Live capture start
