@@ -125,6 +125,16 @@ async function downloadVod(url, folder, onProgress = null) {
     // $PATH), so ffmpegDirOf() returns undefined and yt-dlp finds it itself —
     // path.dirname("ffmpeg") would wrongly resolve to ".".
     ffmpegLocation: ffmpegDirOf(tools.ffmpeg),
+    // YouTube gates its higher-res (720p/1080p+) DASH formats behind a JS
+    // challenge yt-dlp needs a JS runtime to solve — without one, it silently
+    // falls back to a low-res (often 360p) progressive format, which is why
+    // killfeed OCR crops can come out too small to read. yt-dlp only enables
+    // "deno" by default; the Docker image doesn't have deno installed, but
+    // it's a Node app so `node` itself is always present — enabling it here
+    // lets yt-dlp use it to solve the challenge with no new dependency.
+    // (No-op for Twitch/Kick, which don't need this.) Verified locally that
+    // --js-runtimes node alone (no deno) still resolves to a full 1080p format.
+    jsRuntimes: "node",
     restrictFilenames: false,
     noWarnings: true,
     noCheckCertificates: true,
