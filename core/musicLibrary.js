@@ -239,44 +239,66 @@ async function downloadTrack(track, onProgress = null) {
   // UA alongside --impersonate breaks the TLS/UA fingerprint match.
   const impersonate = process.env.YTDLP_IMPERSONATE;
 
-  const subprocess = ytdlp.exec(track.url, {
-    output: path.join(MUSIC_CACHE_DIR, `${track.id}.%(ext)s`),
-    extractAudio: true,
-    audioFormat: "mp3",
-    audioQuality: 0,
-    format: "bestaudio/best",
-    ffmpegLocation: ffmpegDir,
-    noPlaylist: true,
-    noWarnings: true,
-    noCheckCertificates: true,
-    ...(impersonate
-      ? { impersonate }
-      : {
-          addHeader: [
-            "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-            "Referer: https://www.youtube.com/"
-          ]
-        }),
-    progress: true
-  });
+  function attempt() {
+    return new Promise((resolve, reject) => {
+      const subprocess = ytdlp.exec(track.url, {
+        output: path.join(MUSIC_CACHE_DIR, `${track.id}.%(ext)s`),
+        extractAudio: true,
+        audioFormat: "mp3",
+        audioQuality: 0,
+        format: "bestaudio/best",
+        ffmpegLocation: ffmpegDir,
+        noPlaylist: true,
+        noWarnings: true,
+        noCheckCertificates: true,
+        ...(impersonate
+          ? { impersonate }
+          : {
+              addHeader: [
+                "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+                "Referer: https://www.youtube.com/"
+              ]
+            }),
+        progress: true
+      });
 
-  subprocess.stdout.on("data", (chunk) => {
-    const m = chunk.toString().match(/\[download\]\s+(\d+\.\d+)%/i);
-    if (m && onProgress) onProgress(parseFloat(m[1]));
-  });
-  let stderr = "";
-  subprocess.stderr.on("data", (d) => { stderr += d.toString(); console.log("[yt-dlp music]", d.toString()); });
+      subprocess.stdout.on("data", (chunk) => {
+        const m = chunk.toString().match(/\[download\]\s+(\d+\.\d+)%/i);
+        if (m && onProgress) onProgress(parseFloat(m[1]));
+      });
+      let stderr = "";
+      subprocess.stderr.on("data", (d) => { stderr += d.toString(); console.log("[yt-dlp music]", d.toString()); });
 
-  await new Promise((resolve, reject) => {
-    subprocess.on("close", (code) => {
-      if (code !== 0) {
-        const reason = stderr.trim().split(/\r?\n/).pop() || "no output";
-        return reject(new Error(`yt-dlp (music) exited with code ${code}: ${reason}`));
-      }
-      resolve();
+      subprocess.on("close", (code) => {
+        if (code !== 0) {
+          const reason = stderr.trim().split(/\r?\n/).pop() || "no output";
+          return reject(new Error(`yt-dlp (music) exited with code ${code}: ${reason}`));
+        }
+        resolve();
+      });
+      subprocess.on("error", reject);
     });
-    subprocess.on("error", reject);
-  });
+  }
+
+  // yt-dlp occasionally fails a "cold" first request with a 403 (YouTube's bot
+  // gating rejecting the request/challenge) and succeeds right after on retry —
+  // same flakiness class documented elsewhere for this pipeline. Retry a few
+  // times before surfacing the failure.
+  let lastErr;
+  for (let i = 1; i <= 3; i++) {
+    try {
+      await attempt();
+      lastErr = null;
+      break;
+    } catch (err) {
+      lastErr = err;
+      if (i < 3) {
+        console.log(`[yt-dlp music] attempt ${i}/3 failed (${err.message}), retrying...`);
+        await new Promise((r) => setTimeout(r, 1500));
+      }
+    }
+  }
+  if (lastErr) throw lastErr;
 
   let finalFile = outFile;
   if (!fs.existsSync(finalFile)) {

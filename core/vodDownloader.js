@@ -143,45 +143,65 @@ async function downloadVod(url, folder, onProgress = null) {
     args.addHeader = getPlatformHeaders(platform);
   }
 
-  const subprocess = ytdlp.exec(url, args);
+  function attempt() {
+    return new Promise((resolve, reject) => {
+      const subprocess = ytdlp.exec(url, args);
 
-  let destinationFile = null;
+      let destinationFile = null;
 
-  subprocess.stdout.on("data", (chunk) => {
-    const line = chunk.toString();
+      subprocess.stdout.on("data", (chunk) => {
+        const line = chunk.toString();
 
-    const destMatch = line.match(/Destination:\s(.+)/i);
-    if (destMatch) destinationFile = destMatch[1].trim();
+        const destMatch = line.match(/Destination:\s(.+)/i);
+        if (destMatch) destinationFile = destMatch[1].trim();
 
-    const progMatch = line.match(/\[download\]\s+(\d+\.\d+)%/i);
-    if (progMatch && onProgress) onProgress(parseFloat(progMatch[1]));
-  });
+        const progMatch = line.match(/\[download\]\s+(\d+\.\d+)%/i);
+        if (progMatch && onProgress) onProgress(parseFloat(progMatch[1]));
+      });
 
-  subprocess.stderr.on("data", (data) => {
-    console.log("[yt-dlp]", data.toString());
-  });
+      subprocess.stderr.on("data", (data) => {
+        console.log("[yt-dlp]", data.toString());
+      });
 
-  return new Promise((resolve, reject) => {
-    subprocess.on("close", (code) => {
-      if (code !== 0) return reject(new Error(`yt-dlp exited with code ${code}`));
+      subprocess.on("close", (code) => {
+        if (code !== 0) return reject(new Error(`yt-dlp exited with code ${code}`));
 
-      if (!destinationFile) {
-        const files = fs
-          .readdirSync(folder)
-          .map(f => ({ name: f, time: fs.statSync(path.join(folder, f)).mtimeMs }))
-          .sort((a, b) => b.time - a.time);
+        if (!destinationFile) {
+          const files = fs
+            .readdirSync(folder)
+            .map(f => ({ name: f, time: fs.statSync(path.join(folder, f)).mtimeMs }))
+            .sort((a, b) => b.time - a.time);
 
-        if (!files.length) return reject(new Error("Download completed but no file found."));
-        destinationFile = path.join(folder, files[0].name);
-      }
+          if (!files.length) return reject(new Error("Download completed but no file found."));
+          destinationFile = path.join(folder, files[0].name);
+        }
 
-      if (!path.isAbsolute(destinationFile)) {
-        destinationFile = path.join(process.cwd(), destinationFile);
-      }
+        if (!path.isAbsolute(destinationFile)) {
+          destinationFile = path.join(process.cwd(), destinationFile);
+        }
 
-      resolve(destinationFile);
+        resolve(destinationFile);
+      });
     });
-  });
+  }
+
+  // yt-dlp occasionally fails a "cold" first request with a 403 (YouTube's bot
+  // gating rejecting the request/challenge) and succeeds right after on retry —
+  // same flakiness class documented elsewhere for this pipeline. Retry a few
+  // times before surfacing the failure.
+  let lastErr;
+  for (let i = 1; i <= 3; i++) {
+    try {
+      return await attempt();
+    } catch (err) {
+      lastErr = err;
+      if (i < 3) {
+        console.log(`[yt-dlp] attempt ${i}/3 failed (${err.message}), retrying...`);
+        await new Promise((r) => setTimeout(r, 1500));
+      }
+    }
+  }
+  throw lastErr;
 }
 
 module.exports = { downloadVod };
