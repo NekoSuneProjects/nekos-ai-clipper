@@ -174,6 +174,7 @@ app.get("/api/music/items", async (req, res) => {
 app.get("/api/music/preview", async (req, res) => {
   try {
     const file = await musicLibrary.previewTrack(req.query.url || req.query.id);
+    console.log(`[preview] resolved=${file} exists=${fs.existsSync(file)}`);
     // sendFile's callback fires on error too — without it, a failure (e.g. the
     // resolved path going missing) is reported async and falls through to
     // Express's default error page instead of our own JSON/text response.

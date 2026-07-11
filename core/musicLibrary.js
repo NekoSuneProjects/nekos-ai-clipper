@@ -272,10 +272,27 @@ async function getAutoTrack(opts = {}, onProgress = null) {
 }
 
 // Download a ~30s preview snippet of a track for the picker. Cached separately.
+//
+// Concurrent requests for the same id are deduped onto a single in-flight
+// download instead of each spawning their own yt-dlp process against the same
+// output filename — two processes racing on one destination file is how you
+// get one finished + one clobbering it mid-postprocess, which previously
+// showed up as previewTrack() resolving a path that no longer existed by the
+// time res.sendFile() read it.
+const _previewInFlight = new Map(); // id -> Promise<string>
+
 function previewTrack(idOrUrl) {
+  const id = /^https?:/i.test(idOrUrl) ? (idOrUrl.match(/[?&]v=([\w-]+)/)?.[1] || idOrUrl) : idOrUrl;
+  if (_previewInFlight.has(id)) return _previewInFlight.get(id);
+
+  const promise = previewTrackUncached(idOrUrl, id).finally(() => _previewInFlight.delete(id));
+  _previewInFlight.set(id, promise);
+  return promise;
+}
+
+function previewTrackUncached(idOrUrl, id) {
   return new Promise(async (resolve, reject) => {
     ensureDir(MUSIC_CACHE_DIR);
-    const id = /^https?:/i.test(idOrUrl) ? (idOrUrl.match(/[?&]v=([\w-]+)/)?.[1] || idOrUrl) : idOrUrl;
     const url = /^https?:/i.test(idOrUrl) ? idOrUrl : `https://www.youtube.com/watch?v=${idOrUrl}`;
     const outFile = path.join(MUSIC_CACHE_DIR, `${id}_preview.mp3`);
 
@@ -304,6 +321,7 @@ function previewTrack(idOrUrl) {
     });
     proc.stderr.on("data", (d) => { stderr += d.toString(); });
     proc.on("close", (code) => {
+      console.log(`[yt-dlp preview] id=${id} code=${code} realFile=${realFile || "(none)"}`);
       if (realFile && fs.existsSync(realFile)) return resolve(realFile);
       if (fs.existsSync(outFile)) return resolve(outFile);
       // yt-dlp named it differently — grab the newest file for THIS id
@@ -313,9 +331,10 @@ function previewTrack(idOrUrl) {
         .filter((x) => x.startsWith(`${id}_preview`))
         .map((x) => ({ x, t: fs.statSync(path.join(MUSIC_CACHE_DIR, x)).mtimeMs }))
         .sort((a, b) => b.t - a.t);
+      console.log(`[yt-dlp preview] id=${id} fallback candidates:`, f.map((c) => c.x));
       if (f.length) return resolve(path.join(MUSIC_CACHE_DIR, f[0].x));
       const reason = stderr.trim().split(/\r?\n/).pop() || "no output";
-      console.log("[yt-dlp preview]", stderr.trim());
+      console.log("[yt-dlp preview] stderr:", stderr.trim());
       reject(new Error(`Preview download failed (code ${code}): ${reason}`));
     });
     proc.on("error", reject);
