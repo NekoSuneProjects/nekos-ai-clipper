@@ -551,8 +551,18 @@ async function prepareMontageMusic(opts = {}, targetSec = 0, onProgress = null) 
   let total = await audioDuration(tools.ffprobe, first.path);
 
   // 2) Keep adding songs from the same source until the montage is covered.
+  // First 15 attempts only accept a track we haven't used yet. If the source
+  // is small (a short curated fallback list, or a collection that ran dry)
+  // and we can't find anything new, the OLD code just gave up, leaving the
+  // bed shorter than the montage. That short bed then hits -stream_loop -1
+  // in stage 2, which restarts the file from sample 0 — an audible hard
+  // click/skip, not a smooth loop, and it can happen more than once if the
+  // bed is short enough. So once new tracks run out, allow repeats too —
+  // still crossfaded smoothly here — so the bed reliably covers targetSec
+  // and stage 2's loop (if it's ever even reached) is just a safety net.
   let guard = 0;
-  while (total < targetSec && guard < 15) {
+  const maxGuard = 30;
+  while (total < targetSec && guard < maxGuard) {
     guard++;
     let next = null;
     try {
@@ -563,7 +573,7 @@ async function prepareMontageMusic(opts = {}, targetSec = 0, onProgress = null) 
       if (!tr.length) break;
       next = tr[(Date.now() + guard) % tr.length];
     }
-    if (used.has(next.id)) continue;
+    if (used.has(next.id) && guard < 15) continue;
     used.add(next.id);
     try {
       const dl = await downloadTrack({ ...next, collectionId: opts.collectionId }, onProgress);
