@@ -295,12 +295,25 @@ function previewTrack(idOrUrl) {
     ];
     const proc = spawn(tools.ytdlp, args, { windowsHide: true });
     let stderr = "";
+    let realFile = null;
+    proc.stdout.on("data", (d) => {
+      // Trust yt-dlp's own reported destination over guessing from our -o
+      // template — --download-sections can alter the final filename it writes.
+      const m = d.toString().match(/\[(?:ExtractAudio|Merger|Fixup\w*|download)\]\s+Destination:\s*(.+)/i);
+      if (m) realFile = m[1].trim();
+    });
     proc.stderr.on("data", (d) => { stderr += d.toString(); });
     proc.on("close", (code) => {
+      if (realFile && fs.existsSync(realFile)) return resolve(realFile);
       if (fs.existsSync(outFile)) return resolve(outFile);
-      // yt-dlp may have named it differently; grab newest *_preview.mp3
-      const f = fs.readdirSync(MUSIC_CACHE_DIR).filter((x) => x.endsWith("_preview.mp3"));
-      if (f.length) return resolve(path.join(MUSIC_CACHE_DIR, f.sort().pop()));
+      // yt-dlp named it differently — grab the newest file for THIS id
+      // specifically. Matching any "*_preview.mp3" would risk resolving a
+      // different track's stale cache file while this one is actually missing.
+      const f = fs.readdirSync(MUSIC_CACHE_DIR)
+        .filter((x) => x.startsWith(`${id}_preview`))
+        .map((x) => ({ x, t: fs.statSync(path.join(MUSIC_CACHE_DIR, x)).mtimeMs }))
+        .sort((a, b) => b.t - a.t);
+      if (f.length) return resolve(path.join(MUSIC_CACHE_DIR, f[0].x));
       const reason = stderr.trim().split(/\r?\n/).pop() || "no output";
       console.log("[yt-dlp preview]", stderr.trim());
       reject(new Error(`Preview download failed (code ${code}): ${reason}`));

@@ -174,7 +174,12 @@ app.get("/api/music/items", async (req, res) => {
 app.get("/api/music/preview", async (req, res) => {
   try {
     const file = await musicLibrary.previewTrack(req.query.url || req.query.id);
-    res.sendFile(file);
+    // sendFile's callback fires on error too — without it, a failure (e.g. the
+    // resolved path going missing) is reported async and falls through to
+    // Express's default error page instead of our own JSON/text response.
+    res.sendFile(file, (err) => {
+      if (err && !res.headersSent) res.status(500).end(String(err));
+    });
   } catch (err) {
     res.status(500).end(String(err));
   }
