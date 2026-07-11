@@ -28,7 +28,24 @@ fs.mkdirSync(OUTPUT_DIR, { recursive: true });
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
 const MAX_STANDARD_CLIPS = Number(process.env.MAX_CLIPS || 12);
+// APP has no equivalent cap because a human reviews/deselects highlights
+// before rendering; this unattended queue has no review step, so an
+// unusually noisy detection pass (dense kills/reactions) would otherwise
+// concatenate EVERY highlight into one bloated, near-full-length montage.
+const MAX_MONTAGE_CLIPS = Number(process.env.MAX_MONTAGE_CLIPS || 20);
 const ENCODER_PREF = process.env.ENCODER || "auto"; // "auto" | "gpu" | "cpu"
+
+// Best N by score (APP's manual review effectively keeps the best moments,
+// not just whichever came first) — re-sorted back to chronological order
+// afterward since both renderers assume time-ordered highlights.
+function bestHighlights(highlights, max) {
+  if (highlights.length <= max) return highlights;
+  return highlights
+    .slice()
+    .sort((a, b) => (b.score || 0) - (a.score || 0))
+    .slice(0, max)
+    .sort((a, b) => a.startMs - b.startMs);
+}
 
 // ---------------------------------------------------------------------------
 // The worker: download/use input -> analyse -> render. Reuses core modules.
@@ -73,10 +90,14 @@ async function processJob(job, onProgress) {
   const outputs = [];
   if (job.renderMode === "montage") {
     onProgress({ step: "rendering_montage", progress: 0 });
+    const montageHighlights = bestHighlights(highlights, MAX_MONTAGE_CLIPS);
+    if (montageHighlights.length < highlights.length) {
+      job.highlightsTrimmed = highlights.length - montageHighlights.length;
+    }
     let musicPath = null;
     const onMusicProg = (p) => onProgress({ step: "downloading_music", progress: Math.floor(p) });
     // Montage length → chain enough songs from the source to cover it.
-    const montageSec = highlights.reduce((a, h) => a + Math.max(0, (h.endMs - h.startMs) / 1000), 0);
+    const montageSec = montageHighlights.reduce((a, h) => a + Math.max(0, (h.endMs - h.startMs) / 1000), 0);
     try {
       if (job.musicId || job.musicUrl || job.musicSource) {
         const m = await musicLibrary.prepareMontageMusic({
@@ -99,13 +120,19 @@ async function processJob(job, onProgress) {
     } catch (e) {
       job.musicError = String(e.message || e);
     }
-    const res = await renderMontage(videoPath, highlights, musicPath, jobDir,
+    const res = await renderMontage(videoPath, montageHighlights, musicPath, jobDir,
       (p) => onProgress(p), format, ENCODER_PREF);
     if (res.normalOut) outputs.push({ type: "montage", file: path.basename(res.normalOut) });
     if (res.shortOut) outputs.push({ type: "vertical", file: path.basename(res.shortOut) });
   } else {
-    // standard: render the top highlights as individual clips
-    const top = highlights.slice(0, MAX_STANDARD_CLIPS);
+    // standard: render the best highlights as individual clips. Was
+    // highlights.slice(0, MAX_STANDARD_CLIPS) — the FIRST N chronologically,
+    // silently dropping later high-scoring moments in favor of earlier
+    // low-scoring ones whenever a VOD had more than the cap.
+    const top = bestHighlights(highlights, MAX_STANDARD_CLIPS);
+    if (top.length < highlights.length) {
+      job.highlightsTrimmed = highlights.length - top.length;
+    }
     let i = 0;
     for (const h of top) {
       i += 1;
@@ -140,7 +167,7 @@ function publicJob(j) {
     id: j.id, status: j.status, progress: j.progress, step: j.step,
     mode: j.mode, gameId: j.gameId, renderMode: j.renderMode,
     url: j.url, fileName: j.fileName, error: j.error,
-    highlightCount: j.highlightCount, outputs: j.outputs,
+    highlightCount: j.highlightCount, highlightsTrimmed: j.highlightsTrimmed, outputs: j.outputs,
     musicCredit: j.musicCredit, musicError: j.musicError, position: queue.position(j.id),
     createdAt: j.createdAt,
   };

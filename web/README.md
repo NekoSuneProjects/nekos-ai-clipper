@@ -81,7 +81,8 @@ GHCR package public (or `docker login ghcr.io` to pull a private one).
 | `PORT` | 8080 | HTTP port |
 | `DATA_DIR` | `web/data` | where jobs/uploads/outputs are stored |
 | `MAX_UPLOAD_MB` | 4096 | max upload size |
-| `MAX_CLIPS` | 12 | max clips rendered in "standard" mode |
+| `MAX_CLIPS` | 12 | max clips rendered in "standard" mode (best-scoring, not just first-detected) |
+| `MAX_MONTAGE_CLIPS` | 20 | max highlights chained into a "montage" render (same reasoning — the desktop app lets you deselect noisy detections before rendering; this queue has no review step, so a cap keeps a noisy detection pass from producing a bloated, near-full-length montage) |
 | `ENCODER` | `auto` | `auto` / `gpu` / `cpu` — see the GPU VPS section above |
 | `RETENTION_HOURS` | 24 | auto-delete job files older than this (cloud space saving) |
 | `SUPPORT_KOFI` / `SUPPORT_PATREON` / `SUPPORT_PAYPAL` / `SUPPORT_GITHUB` | (off) | donate button URLs shown in the UI |

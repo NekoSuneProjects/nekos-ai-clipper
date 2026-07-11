@@ -170,7 +170,7 @@ function jobCard(j) {
     </div>
     <div class="mt-1 text-xs text-gray-400">${step} ${pct ? "· " + pct + "%" : ""}</div>
     ${j.error ? `<div class="mt-2 text-xs text-red-400">${j.error}</div>` : ""}
-    ${j.status === "done" ? `<div class="mt-2 text-xs text-gray-300">${j.highlightCount || 0} highlight(s)</div>` : ""}
+    ${j.status === "done" ? `<div class="mt-2 text-xs text-gray-300">${j.highlightCount || 0} highlight(s)${j.highlightsTrimmed ? ` <span class="text-gray-500">(kept the best ${j.highlightCount - j.highlightsTrimmed}, trimmed ${j.highlightsTrimmed} lower-scoring)</span>` : ""}</div>` : ""}
     ${outputs ? `<div class="mt-2">${outputs}</div>` : ""}
     ${j.musicCredit ? `
     <div class="mt-2">
