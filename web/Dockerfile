@@ -29,7 +29,15 @@ WORKDIR /app
 # The web app lives in MyOwnCode/web and reuses MyOwnCode/{core,tools,node_modules}.
 # Copy the whole MyOwnCode project (build context = MyOwnCode), minus dist/tools bins.
 COPY package.json package-lock.json* ./
-RUN npm install --omit=dev && npm install express multer --omit=dev
+# express/multer are now pinned in package.json (see package-lock.json) — this
+# used to be a separate unpinned `npm install express multer`, which silently
+# resolved to Express 5 once that became npm's "latest" dist-tag. Express 5's
+# rewritten `send` package defaults res.sendFile()'s dotfiles handling to
+# reject ANY path containing a dot-prefixed segment (not just a dotfile as the
+# final component) — and MUSIC_CACHE_DIR lives under ~/.config/..., so every
+# music preview/download 404'd. Pinning avoids silently drifting major
+# versions on every image rebuild.
+RUN npm install --omit=dev
 
 COPY core ./core
 COPY tools/toolsManager.js ./tools/toolsManager.js

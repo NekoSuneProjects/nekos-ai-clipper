@@ -174,21 +174,15 @@ app.get("/api/music/items", async (req, res) => {
 app.get("/api/music/preview", async (req, res) => {
   try {
     const file = await musicLibrary.previewTrack(req.query.url || req.query.id);
-    console.log(`[preview] resolved=${file} exists=${fs.existsSync(file)}`);
-    // sendFile's callback fires on error too — without it, a failure (e.g. the
-    // resolved path going missing) is reported async and falls through to
-    // Express's default error page instead of our own JSON/text response.
-    res.sendFile(file, (err) => {
-      if (err && !res.headersSent) {
-        // err.code carries the underlying fs error (ENOENT/ENOTDIR/etc) that
-        // "NotFoundError: Not Found" alone hides — re-checking existence right
-        // here pins down whether the file vanished between our check above and
-        // send()'s own stat, or something else is going on (e.g. a permissions
-        // issue that send maps to a 404 the same way).
-        console.log(`[preview] sendFile failed for ${file}: code=${err.code} status=${err.status} existsNow=${fs.existsSync(file)}`);
-        console.log(`[preview] error stack:`, err.stack);
-        res.status(500).end(String(err));
-      }
+    // dotfiles: 'allow' — MUSIC_CACHE_DIR lives under ~/.config/..., and
+    // Express 5's rewritten `send` package (unlike Express 4's) rejects ANY
+    // path containing a dot-prefixed segment by default, not just a dotfile
+    // as the final component. Without this every preview 404'd even though
+    // the file genuinely existed. sendFile's callback fires on error too —
+    // without it, a failure is reported async and falls through to Express's
+    // default error page instead of our own JSON/text response.
+    res.sendFile(file, { dotfiles: "allow" }, (err) => {
+      if (err && !res.headersSent) res.status(500).end(String(err));
     });
   } catch (err) {
     res.status(500).end(String(err));
@@ -265,7 +259,11 @@ app.get("/api/jobs/:id/files/:name", (req, res) => {
   const safe = path.basename(req.params.name);
   const file = path.join(OUTPUT_DIR, j.id, safe);
   if (!fs.existsSync(file)) return res.status(404).end();
-  res.sendFile(file);
+  // dotfiles: 'allow' — see the /api/music/preview route for why: Express 5's
+  // send package 404s any path with a dot-prefixed segment by default, not
+  // just a dotfile filename. DATA_DIR isn't under a dotfile today, but this
+  // costs nothing and avoids the same class of bug if that ever changes.
+  res.sendFile(file, { dotfiles: "allow" });
 });
 
 // ---------------------------------------------------------------------------
