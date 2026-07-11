@@ -117,7 +117,16 @@ async function downloadVod(url, folder, onProgress = null) {
 
   const args = {
     output: outputTemplate,
-    format: "mp4/bv*+ba/b",
+    // Was "mp4/bv*+ba/b" — a bare "mp4" alternative matches ANY complete
+    // (audio+video muxed) mp4 format, even a low-res one. Lots of YouTube
+    // videos only have ONE complete mp4 (the legacy 360p progressive
+    // format, id 18) — everything above that is video-only DASH needing a
+    // separate audio merge. Since "mp4" alone was satisfied by that 360p
+    // format, yt-dlp never even tried the better bv*+ba merge. Verified
+    // against a real video where this was happening: old string picked
+    // 360p (format 18); this one correctly picks the 1080p DASH video
+    // (format 137) merged with audio (format 140).
+    format: "bv*[ext=mp4]+ba[ext=m4a]/bv*+ba/b",
     // yt-dlp needs ffmpeg to merge bv*+ba and to remux HLS clips (FixupM3u8).
     // The desktop app bundles ffmpeg in AppData (not on PATH), so point yt-dlp at
     // it there — without this, Kick/HLS clip downloads fail with "exited with
