@@ -186,6 +186,7 @@ app.get("/api/music/preview", async (req, res) => {
         // send()'s own stat, or something else is going on (e.g. a permissions
         // issue that send maps to a 404 the same way).
         console.log(`[preview] sendFile failed for ${file}: code=${err.code} status=${err.status} existsNow=${fs.existsSync(file)}`);
+        console.log(`[preview] error stack:`, err.stack);
         res.status(500).end(String(err));
       }
     });
