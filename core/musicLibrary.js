@@ -92,10 +92,13 @@ function listCollections() {
 // A collection's `attribution` in MusicTracks.json is a TEMPLATE — it can use
 // {artist}/{title}/{url} placeholders, filled in per-track here, so credit
 // reads like "Artist: Pegboard Nerds / Track: Hero" instead of a generic
-// per-collection blurb. {url} prefers track.listenUrl (the source's own
+// per-collection blurb. {url} prefers track.bioLinks.url (the source's own
 // release link, e.g. monster.cat/…, doub.link/…, pulled from the video's
-// description — see extractBioLink below) and falls back to the YouTube url
-// when no such link was found there.
+// description — see extractBioLink below); some sources need MORE than one
+// link (NCS credit wants both a "Free Download/Stream:" ncs.io link AND a
+// separate "Watch:" ncs.lnk.to link) — any other key in track.bioLinks fills
+// the matching {key} placeholder (e.g. {watchUrl}) the same way. Anything
+// left unfilled falls back to the plain YouTube url.
 //
 // Generic fallback ONLY when a collection has no attribution template at all
 // — do not assert a specific source/license here (this used to hardcode
@@ -103,10 +106,18 @@ function listCollections() {
 // Ninety9Lives, etc., which is simply false attribution).
 function attributionFor(track) {
   if (track && track.attribution) {
-    return track.attribution
+    let text = track.attribution
       .replace(/\{artist\}/g, track.artist || "Unknown")
-      .replace(/\{title\}/g, track.title || "")
-      .replace(/\{url\}/g, (track.listenUrl || track.url) || "");
+      .replace(/\{title\}/g, track.title || "");
+    const links = { url: track.url, ...(track.bioLinks || {}) };
+    for (const [key, val] of Object.entries(links)) {
+      if (val) text = text.split(`{${key}}`).join(val);
+    }
+    // Any placeholder left over (a link pattern was configured but nothing
+    // matched in the description) gets the plain YouTube url rather than a
+    // literal "{watchUrl}" showing up in the credit text.
+    text = text.replace(/\{\w+\}/g, () => track.url || "");
+    return text;
   }
   return `Music: ${track.title} — ${track.artist}`;
 }
@@ -142,16 +153,36 @@ function extractBioLink(description, pattern) {
   return hit ? hit.replace(/[)\].,;:!?'"]+$/, "") : null;
 }
 
-// Resolve track.listenUrl from the collection's bioLinkPattern, if set.
-// Never throws — a failed/slow lookup just means no listenUrl override.
-async function resolveListenUrl(collection, url) {
-  if (!collection || !collection.bioLinkPattern) return null;
+// A collection can name one bio-link pattern (bioLinkPattern, a plain string
+// — becomes the {url} placeholder) or several named ones (bioLinkPatterns,
+// an object — each key becomes its own {key} placeholder, e.g.
+// { url: "ncs\\.io", watchUrl: "lnk\\.to" }).
+function bioLinkPatternsOf(collection) {
+  if (!collection) return null;
+  if (collection.bioLinkPatterns && typeof collection.bioLinkPatterns === "object") {
+    return collection.bioLinkPatterns;
+  }
+  if (collection.bioLinkPattern) return { url: collection.bioLinkPattern };
+  return null;
+}
+
+// Resolve track.bioLinks ({ url, ...anyOtherNamedLinks }) from the
+// collection's bio-link pattern(s), if any are set. Fetches the description
+// ONCE regardless of how many named patterns there are. Never throws — a
+// failed/slow lookup just means no bioLinks overrides.
+async function resolveBioLinks(collection, url) {
+  const patterns = bioLinkPatternsOf(collection);
+  if (!patterns) return {};
   try {
     const tools = await prepareTools();
     const desc = await getVideoDescription(tools.ytdlp, url);
-    return extractBioLink(desc, collection.bioLinkPattern);
+    const links = {};
+    for (const [key, pattern] of Object.entries(patterns)) {
+      links[key] = extractBioLink(desc, pattern);
+    }
+    return links;
   } catch {
-    return null;
+    return {};
   }
 }
 
@@ -210,7 +241,7 @@ async function getRandomFromCollection(collection, seed) {
     title: pick.title || pick.id,
     artist: collection.name,
     url,
-    listenUrl: await resolveListenUrl(collection, url),
+    bioLinks: await resolveBioLinks(collection, url),
     attribution: collection.attribution,
     creditRequired: collection.creditRequired !== false
   };
@@ -457,7 +488,7 @@ async function getTrack(opts = {}, onProgress = null) {
     title: opts.title || id,
     artist: opts.artist || (col ? col.name : "Unknown"),
     url,
-    listenUrl: await resolveListenUrl(col, url),
+    bioLinks: await resolveBioLinks(col, url),
     attribution: opts.attribution !== undefined ? opts.attribution : (col ? col.attribution : undefined),
     creditRequired: opts.creditRequired !== undefined ? opts.creditRequired !== false : (col ? col.creditRequired !== false : true),
     warning: opts.warning !== undefined ? opts.warning : (col ? col.warning : undefined)
