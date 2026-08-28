@@ -50,7 +50,7 @@
     }
   },
   "dependencies": {
-    "express": "^4.22.2",
+    "express": "^5.2.1",
     "fluent-ffmpeg": "^2.1.2",
     "multer": "^2.2.0",
     "png-chunks-extract": "^1.0.0",
